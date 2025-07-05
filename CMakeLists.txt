@@ -1,35 +1,52 @@
-cmake_minimum_required(VERSION 3.10)
-project(mini_search_engine)
+    cmake_minimum_required(VERSION 3.10)
+    project(mini_search_engine)
 
-# Dependencies
-find_package(CURL REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GUMBO REQUIRED gumbo)
+    # Dependencies
+    find_package(CURL REQUIRED)
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    # Gumbo configuration
+    find_path(GUMBO_INCLUDE_DIR gumbo.h)
+    find_library(GUMBO_LIBRARY NAMES gumbo gumbo_static)
 
-# Include directories
-include_directories(
-    ${PROJECT_SOURCE_DIR}/third_party/concurrentqueue
-    ${GUMBO_INCLUDE_DIRS}
-)
+    if(GUMBO_INCLUDE_DIR AND GUMBO_LIBRARY)
+        add_library(Gumbo::Gumbo UNKNOWN IMPORTED)
+        set_target_properties(Gumbo::Gumbo PROPERTIES
+            IMPORTED_LOCATION "${GUMBO_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${GUMBO_INCLUDE_DIR}"
+        )
+    else()
+        message(FATAL_ERROR "Gumbo library not found")
+    endif()
 
-# Executable
-add_executable(crawler 
-    src/crawler.cpp 
-    src/utils.cpp
-)
+    # Set C++ standard
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Linking
-target_link_libraries(crawler 
-    ${CURL_LIBRARIES} 
-    pthread
-    ${GUMBO_LDFLAGS}
-)
+    add_compile_options(-fstack-protector-strong)
+    add_compile_options(-Wstack-usage=8192) # 8KB stack limit warning
+    # Add third-party libraries
+    # Include directories
+    include_directories(
+         ${PROJECT_SOURCE_DIR}/third_party  # Add this line
+        ${PROJECT_SOURCE_DIR}/third_party/concurrentqueue
+        ${GUMBO_INCLUDE_DIR}
+    )
 
-# Install third-party deps script
-add_custom_target(get_deps 
-    COMMAND ./scripts/install_deps.sh
-)
+    # Executable
+    add_executable(crawler 
+        src/crawler.cpp 
+        src/utils.cpp
+    )
+
+    # Linking
+    target_link_libraries(crawler 
+        ${CURL_LIBRARIES}
+        pthread
+        Gumbo::Gumbo
+        stdc++fs
+    )
+
+    # Install third-party deps script
+    add_custom_target(get_deps 
+        COMMAND ./scripts/install_deps.sh
+    )
