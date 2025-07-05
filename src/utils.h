@@ -1,30 +1,34 @@
 #pragma once
-#include <string>
-#include <unordered_map>
-#include <mutex>
-#include <chrono>
-#include <vector>
 
-// Function declarations
-std::string extract_domain(const std::string& url);
-std::vector<std::string> canonicalize_urls(const std::string& base_url, const std::vector<std::string>& urls);
-void save_as_json(const std::string& url, const std::string& html, const std::string& output_dir);
-void log_error(const std::string& message);
+#include <string>
+#include <vector>
+#include <mutex>
+#include <unordered_map>
+#include <chrono>
+#include <functional>
+#include <curl/curl.h>
 
 class RobotsTxtCache {
-public:
-    bool is_allowed(const std::string& url, const std::string& user_agent);
-    void parse(const std::string& domain, const std::string& content);
-    
 private:
-    std::unordered_map<std::string, std::string> rules_;
     std::mutex mutex_;
+    std::unordered_map<std::string, std::string> rules_;
+
+public:
+    bool is_allowed(const std::string& domain);
+    void parse(const std::string& domain, const std::string& content);
 };
 
 class RateLimiter {
+private:
+    std::mutex mutex_;
+    std::unordered_map<std::string, std::chrono::steady_clock::time_point> last_fetch_;
+
 public:
     void wait_for_domain(const std::string& domain);
-private:
-    std::unordered_map<std::string, std::chrono::steady_clock::time_point> last_fetch_;
-    std::mutex mutex_;
 };
+
+std::string extract_domain(const std::string& url);
+std::vector<std::string> canonicalize_urls(const std::string& base_url, const std::vector<std::string>& urls);
+void save_batch_as_json(std::vector<std::pair<std::string, std::string>>& batch, const std::string& output_dir);
+void log_error(const std::string& message);
+std::string base64_encode(const std::string& in);

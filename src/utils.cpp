@@ -7,27 +7,20 @@
 #include <thread>
 #include <chrono>
 #include <filesystem>
+#include <queue>
+#include <sstream>
+#include <iomanip>
 
 namespace fs = std::filesystem;
 
-/**
- * cURL write callback for robots.txt content
- * 
- * @param contents Pointer to the data buffer
- * @param size     Size of each data element
- * @param nmemb    Number of elements
- * @param userp    Pointer to target string
- * @return         Number of bytes processed
- */
 static size_t write_callback_robots(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t total_size = size * nmemb;
     static_cast<std::string*>(userp)->append(static_cast<char*>(contents), total_size);
     return total_size;
 }
 
-// Simple base64 encoder
 std::string base64_encode(const std::string& in) {
-    static const char* base64_chars =
+    static const char* base64_chars = 
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
         "0123456789+/";
@@ -47,40 +40,16 @@ std::string base64_encode(const std::string& in) {
     return out;
 }
 
-bool RobotsTxtCache::is_allowed(const std::string& url, const std::string& user_agent) {
-    std::string domain = extract_domain(url);
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (rules_.find(domain) == rules_.end()) {
-            CURL* curl = curl_easy_init();
-            std::string robots_url = "http://" + domain + "/robots.txt";
-            std::string response;
-            curl_easy_setopt(curl, CURLOPT_URL, robots_url.c_str());
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback_robots);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-            curl_easy_setopt(curl, CURLOPT_USERAGENT, user_agent.c_str());
-            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
-            CURLcode res = curl_easy_perform(curl);
-            if (res == CURLE_OK) {
-                parse(domain, response);
-            }
-            curl_easy_cleanup(curl);
-        }
-    }
-    return true; // Simplified for initial version
-}
-
-void RobotsTxtCache::parse(const std::string& domain, const std::string& content) {
-    rules_[domain] = content; // Basic implementation
+bool RobotsTxtCache::is_allowed(const std::string& domain) {
+    // Simplified robots.txt check - allow all by default
+    return true;
 }
 
 void RateLimiter::wait_for_domain(const std::string& domain) {
-    const std::chrono::milliseconds delay(100);  // Reduce from 1000ms to 100ms
+    const std::chrono::milliseconds delay(50); // Reduced to 50ms
     std::lock_guard<std::mutex> lock(mutex_);
     auto now = std::chrono::steady_clock::now();
     
-    // Only wait if we've fetched from this domain recently
     if (last_fetch_.find(domain) != last_fetch_.end()) {
         auto elapsed = now - last_fetch_[domain];
         if (elapsed < delay) {
@@ -91,9 +60,9 @@ void RateLimiter::wait_for_domain(const std::string& domain) {
 }
 
 std::string extract_domain(const std::string& url) {
-    std::regex domain_regex(R"(^(?:https?:\/\/)?([^\/:]+))");
+    static std::regex domain_regex(R"(^(?:https?:\/\/)?([^\/:]+))");
     std::smatch match;
-    if (std::regex_search(url, match, domain_regex)) {
+    if (std::regex_search(url, match, domain_regex) && match.size() > 1) {
         return match[1];
     }
     return "";
@@ -101,71 +70,106 @@ std::string extract_domain(const std::string& url) {
 
 std::vector<std::string> canonicalize_urls(const std::string& base_url, const std::vector<std::string>& urls) {
     std::vector<std::string> cleaned;
+    cleaned.reserve(urls.size());
+    
+    // Precompute base components
+    size_t protocol_end = base_url.find("://");
+    if (protocol_end == std::string::npos) {
+        return cleaned;
+    }
+    
+    std::string base_protocol = base_url.substr(0, protocol_end + 3);
+    size_t domain_end = base_url.find('/', protocol_end + 3);
+    std::string base_domain = (domain_end == std::string::npos) 
+        ? base_url.substr(protocol_end + 3)
+        : base_url.substr(protocol_end + 3, domain_end - protocol_end - 3);
+    
     for (const auto& url : urls) {
-        std::string clean_url = url;
+        if (url.empty()) continue;
         
-        // Remove fragment identifiers
-        size_t pos = clean_url.find('#');
-        if (pos != std::string::npos) {
-            clean_url = clean_url.substr(0, pos);
+        std::string clean_url;
+        
+        // Skip javascript and mailto links
+        if (url.find("javascript:") == 0 || url.find("mailto:") == 0) {
+            continue;
         }
         
-        // Normalize relative URLs
+        // Remove fragment
+        size_t frag_pos = url.find('#');
+        if (frag_pos != std::string::npos) {
+            clean_url = url.substr(0, frag_pos);
+        } else {
+            clean_url = url;
+        }
+        
+        // Handle relative URLs
         if (clean_url.find("://") == std::string::npos) {
-            // Handle relative paths properly
             if (clean_url[0] == '/') {
                 // Absolute path
-                std::string protocol = base_url.substr(0, base_url.find("://") + 3);
-                std::string domain = extract_domain(base_url);
-                clean_url = protocol + domain + clean_url;
+                clean_url = base_protocol + base_domain + clean_url;
             } else {
-                // Relative path
-                std::string base = base_url.substr(0, base_url.find_last_of('/') + 1);
-                clean_url = base + clean_url;
+                // Relative path - use base URL directly
+                clean_url = base_url + (base_url.back() == '/' ? "" : "/") + clean_url;
             }
         }
         
-        // Remove duplicate slashes
-        std::string::size_type n = 0;
-        while ((n = clean_url.find("//", n)) != std::string::npos) {
-            if (n > 0 && clean_url[n-1] != ':' && n < clean_url.length()-2) {
-                clean_url.replace(n, 2, "/");
-            } else {
-                n += 2;
+        // Basic normalization
+        if (!clean_url.empty()) {
+            // Remove duplicate slashes (except after http:)
+            size_t pos = clean_url.find("://");
+            if (pos != std::string::npos) {
+                std::string protocol = clean_url.substr(0, pos + 3);
+                std::string path = clean_url.substr(pos + 3);
+                
+                size_t dpos = 0;
+                while ((dpos = path.find("//", dpos)) != std::string::npos) {
+                    path.replace(dpos, 2, "/");
+                    dpos += 1;
+                }
+                clean_url = protocol + path;
             }
+            
+            // Remove trailing slash
+            if (clean_url.size() > 1 && clean_url.back() == '/') {
+                clean_url.pop_back();
+            }
+            
+            cleaned.push_back(clean_url);
         }
-        
-        // Remove trailing slashes
-        if (clean_url.size() > 1 && clean_url.back() == '/') {
-            clean_url.pop_back();
-        }
-        
-        cleaned.push_back(clean_url);
     }
     return cleaned;
 }
 
-// utils.cpp - updated save_as_json function
-void save_as_json(const std::string& url, const std::string& html, const std::string& output_dir) {
+void save_batch_as_json(std::vector<std::pair<std::string, std::string>>& batch, 
+                        const std::string& output_dir) {
     try {
         fs::create_directories(output_dir);
         
-        // Generate safe filename (hash + truncate)
-        std::string hash = std::to_string(std::hash<std::string>{}(url));
-        std::string safe_filename = hash.substr(0, 16) + ".json";
+        // Create timestamped batch file
+        auto now = std::chrono::system_clock::now();
+        auto in_time_t = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&in_time_t), "%Y%m%d_%H%M%S");
+        std::string batch_name = "batch_" + ss.str() + ".json";
+        fs::path file_path = fs::path(output_dir) / batch_name;
         
-        fs::path file_path = fs::path(output_dir) / safe_filename;
         std::ofstream outfile(file_path);
-        
         if (outfile) {
-            std::string encoded = base64_encode(html);
-            outfile << "{ \"url\": \"" << url << "\", \"html_base64\": \"" << encoded << "\" }";
-            std::cout << "Saved: " << file_path << std::endl;
-        } else {
-            log_error("Failed to open file: " + file_path.string());
+            outfile << "[\n";
+            bool first = true;
+            
+            for (auto& [url, html] : batch) {
+                if (!first) outfile << ",\n";
+                first = false;
+                
+                std::string encoded = base64_encode(html);
+                outfile << "  { \"url\": \"" << url << "\", \"html_base64\": \"" << encoded << "\" }";
+            }
+            
+            outfile << "\n]";
         }
     } catch (const std::exception& e) {
-        log_error("Error saving file: " + std::string(e.what()));
+        log_error("Error saving batch: " + std::string(e.what()));
     }
 }
 
