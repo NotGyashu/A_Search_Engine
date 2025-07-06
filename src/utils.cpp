@@ -46,7 +46,7 @@ bool RobotsTxtCache::is_allowed(const std::string& domain) {
 }
 
 void RateLimiter::wait_for_domain(const std::string& domain) {
-    const std::chrono::milliseconds delay(50); // Reduced to 50ms
+    const std::chrono::milliseconds delay(25); // Faster for production search engine
     std::lock_guard<std::mutex> lock(mutex_);
     auto now = std::chrono::steady_clock::now();
     
@@ -66,6 +66,36 @@ std::string extract_domain(const std::string& url) {
         return match[1];
     }
     return "";
+}
+
+bool is_useful_url(const std::string& url) {
+    // Skip common static file extensions
+    static const std::vector<std::string> bad_extensions = {
+        ".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+        ".mp3", ".mp4", ".avi", ".mov", ".pdf", ".zip", ".gz", ".tar", ".exe", ".dmg", ".bin"
+    };
+    for (const auto& ext : bad_extensions) {
+        if (url.find(ext) != std::string::npos) {
+            return false;
+        }
+    }
+
+    // Skip logout/signout links
+    static const std::vector<std::string> bad_keywords = {
+        "logout", "signout"
+    };
+    for (const auto& kw : bad_keywords) {
+        if (url.find(kw) != std::string::npos) {
+            return false;
+        }
+    }
+
+    // Skip URLs that are too long
+    if (url.length() > 200) {
+        return false;
+    }
+
+    return true;
 }
 
 std::vector<std::string> canonicalize_urls(const std::string& base_url, const std::vector<std::string>& urls) {
