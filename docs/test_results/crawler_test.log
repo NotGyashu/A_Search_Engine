@@ -1,0 +1,647 @@
+🚀 HYBRID SPEED CRAWLER - Production-Ready Ultimate Performance
+================================================================
+Configuration - Phase 2 Enhanced:
+- Network workers: 4
+- HTML processors: 2
+- Max crawl depth: 3
+- Max queue size: 10000
+- Target performance: 300+ pages/sec
+- Phase 2 features: Sharded disk, Work stealing, HTML pipeline
+================================================================
+
+✅ Seeded hybrid crawler with 33/33 URLs
+📊 POST-SEED QUEUE STATUS:
+   Memory Queue: 33 URLs
+   Sharded Disk Queue: 0 URLs
+   Work Stealing Queue: 0 URLs
+   Total Available: 33 URLs
+
+🚀 Starting Phase 2 workers:
+   Network workers: 4
+   HTML processors: 2
+🔧 HTML processor 0 starting...
+🔧 HTML processor 1 starting...
+🏃 Worker 0 starting with MAX_CONCURRENT=25
+🏃 Worker 1 starting with MAX_CONCURRENT=25
+🏃 Worker 3 starting with MAX_CONCURRENT=25
+🏃 Worker 2 starting with MAX_CONCURRENT=25
+⚠️ Worker 1 exhausted all URL sources (count: 1)
+📊 POST-WORKER START STATUS (after 2s):
+   Memory Queue: 1753 URLs
+   Sharded Disk Queue: 565 URLs
+   Work Stealing Queue: 2000 URLs
+   HTML Processing Queue: 0 tasks
+
+🚀 Phase 2 Enhanced Crawler started!
+   Network pipeline: 4 workers
+   HTML pipeline: 2 processors
+   Target: 300+ pages/sec with pipelined processing
+Press Ctrl+C to gracefully shutdown
+
+📊 Starting continuous queue & speed monitoring...
+🔍 STARTUP QUEUE STATUS:
+   Memory Queue: 1753 URLs
+   Sharded Disk Queue: 565 URLs
+   Work Stealing Queue: 2000 URLs
+   HTML Processing Queue: 0 tasks
+   Total Available: 4318 URLs
+
+🔧 HTML processor 0: 100 batches, 10747 links (2149.4 links/s)
+🔧 HTML processor 1: 100 batches, 11614 links (2322.8 links/s)
+[   5s] Main: 6278 | Disk: 24377 | Work: 2000 | HTML:   3 | Speed:   45.7 p/s | Total:    320
+🔧 HTML processor 0: 200 batches, 22028 links (2753.5 links/s)
+🔧 HTML processor 1: 200 batches, 22649 links (2831.1 links/s)
+
+Received shutdown signal. Gracefully shutting down hybrid crawler...
+🔧 HTML processor 0 finished. Processed 259 batches, 29951 total links.
+🔧 HTML processor 1 finished. Processed 247 batches, 29039 total links.
+Multi-worker 1 finished. Processed 116 pages.
+Multi-worker 2 finished. Processed 143 pages.
+Multi-worker 0 finished. Processed 124 pages.
+Multi-worker 3 finished. Processed 133 pages.
+[  10s] Main: 9146 | Disk: 45750 | Work: 2000 | HTML:  10 | Speed:   43.0 p/s | Total:    516
+
+🎯 FINAL PHASE 2 CRAWLER RESULTS
+===================================
+
+================== CRAWLER STATISTICS ==================
+Runtime: 12 seconds
+Crawl rate: 43.00 pages/sec
+Discovery rate: 1103.33 links/sec
+Download rate: 1.91 MB/sec
+Total pages: 516
+Total links: 13240
+Network errors: 8
+Queue size: 9146
+Active threads: 0
+========================================================
+
+
+=== ERROR STATISTICS ===
+Domain: ga.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: nov.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: rm.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ti.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ltg.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: jank-lang.org
+  Consecutive timeouts: 0
+
+Domain: bar.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: am.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: als.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bcl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ia.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: min.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ar.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: war.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: eml.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ie.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: pcd.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: lo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: km.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: cdo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: lmo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: br.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: mwl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: iu.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sk.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: yi.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: meta.wikimedia.org
+  Consecutive timeouts: 0
+
+Domain: tt.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: simple.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ku.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: tg.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: rue.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: si.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: li.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: wikidata.org
+  Consecutive timeouts: 0
+
+Domain: oc.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ang.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bbc.com
+  Consecutive timeouts: 0
+
+Domain: mk.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: io.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: fo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: pms.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: co.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: hr.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: gv.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ml.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: en.wikiversity.org
+  Consecutive timeouts: 0
+
+Domain: ps.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: en.wikiquote.org
+  Consecutive timeouts: 0
+
+Domain: kw.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: af.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: it.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ro.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: scholar.google.com
+  Consecutive timeouts: 0
+
+Domain: news.ycombinator.com
+  Timeout was reached: 1
+  Consecutive timeouts: 0
+
+Domain: zh.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: lb.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: pnb.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: github.com
+  Consecutive timeouts: 0
+
+Domain: gcr.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: zu.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: lt.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: tr.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: cy.wikipedia.org
+  Timeout was reached: 1
+  Consecutive timeouts: 0
+
+Domain: jsonplaceholder.typicode.com
+  Consecutive timeouts: 0
+
+Domain: httpbin.org
+  Consecutive timeouts: 0
+
+Domain: hy.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: et.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: stackoverflow.com
+  Consecutive timeouts: 0
+
+Domain: en.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: mr.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: arxiv.org
+  Consecutive timeouts: 0
+
+Domain: gu.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: be.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: my.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: da.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: hu.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: azb.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: roa-rup.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ary.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: new.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: www.reuters.com
+  Consecutive timeouts: 0
+
+Domain: jv.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: nn.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ms.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: az.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: fr.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sh.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: lez.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bg.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: el.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: kn.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: info.arxiv.org
+  Consecutive timeouts: 0
+
+Domain: eu.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: hi.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: th.wikipedia.org
+  Timeout was reached: 1
+  Consecutive timeouts: 0
+
+Domain: tw.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ru.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sc.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: donate.wikimedia.org
+  Consecutive timeouts: 0
+
+Domain: en.wikibooks.org
+  Consecutive timeouts: 0
+
+Domain: kaa.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: he.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: zh-min-nan.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: zh-classical.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: kk.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: glk.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: so.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: tl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: zh-yue.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bs.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: as.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: mzn.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ckb.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: nl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: cornell.edu
+  Consecutive timeouts: 0
+
+Domain: sd.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ceb.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: olo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: be-tarask.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: frr.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sat.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: or.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: mg.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: foundation.wikimedia.org
+  Consecutive timeouts: 0
+
+Domain: mn.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: nds-nl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: qu.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: wuu.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: gl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ug.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: id.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ja.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: la.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ne.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: cs.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: is.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: hif.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: scn.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bew.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: lv.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: no.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: fiu-vro.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: gan.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ba.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: pap.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ka.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: fa.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sr.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: pdc.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: es.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: commons.wikimedia.org
+  Consecutive timeouts: 0
+
+Domain: gn.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bn.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: bh.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: te.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ilo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ext.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ur.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: vi.wikipedia.org
+  Timeout was reached: 1
+  Consecutive timeouts: 0
+
+Domain: ko.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sq.wikipedia.org
+  Timeout was reached: 1
+  Consecutive timeouts: 0
+
+Domain: pl.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: pt.wikipedia.org
+  Timeout was reached: 1
+  Consecutive timeouts: 0
+
+Domain: lij.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: en.wikisource.org
+  Consecutive timeouts: 0
+
+Domain: mediawiki.org
+  Consecutive timeouts: 0
+
+Domain: fi.wikipedia.org
+  Timeout was reached: 1
+  Consecutive timeouts: 0
+
+Domain: ca.wikipedia.org
+  Timeout was reached: 1
+  Consecutive timeouts: 1
+
+Domain: blog.arxiv.org
+  Consecutive timeouts: 0
+
+Domain: eo.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: uk.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ast.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ta.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: news.cornell.edu
+  Consecutive timeouts: 0
+
+Domain: uz.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: hak.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: de.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: lad.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: sv.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: ky.wikipedia.org
+  Consecutive timeouts: 0
+
+Domain: xmf.wikipedia.org
+  Consecutive timeouts: 0
+
+📊 PHASE 2 QUEUE FINAL STATS:
+   Memory Queue: 9146 URLs remaining
+   Sharded Disk Queue: 45750 URLs remaining
+   Work Stealing Queue: 2000 URLs remaining
+   HTML Processing Queue: 10 tasks remaining
+📊 Performance: 43.0 pages/sec
+🏁 Phase 2 Enhanced Crawler shutdown complete.

@@ -1,0 +1,6 @@
+[submodule "crawler/third_party/concurrentqueue"]
+	path = crawler/third_party/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue.git
+[submodule "crawler/third_party/gumbo-parser"]
+	path = crawler/third_party/gumbo-parser
+	url = https://github.com/google/gumbo-parser.git
