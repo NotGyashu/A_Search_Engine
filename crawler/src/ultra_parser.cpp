@@ -4,6 +4,7 @@
  */
 
 #include "ultra_parser.h"
+#include "constants.h"
 #include <algorithm>
 #include <cstring>
 #include <chrono>
@@ -24,7 +25,7 @@ static std::atomic<size_t> g_simd_filtered{0};
 static std::atomic<size_t> g_links_extracted{0};
 
 // Configuration globals
-static size_t g_max_html_size = 51200; // 50KB default
+static size_t g_max_html_size = CrawlerConstants::SIMD::MAX_HTML_SIZE;
 static bool g_simd_enabled = true;
 
 // ============= STAGE 1: SIMD PREFILTER IMPLEMENTATION =============
@@ -68,16 +69,16 @@ SIMDPrefilter::~SIMDPrefilter() {
 }
 
 bool SIMDPrefilter::is_html_content(const char* data, size_t len) const {
-    if (!g_simd_enabled || len < 50) {
+    if (!g_simd_enabled || len < CrawlerConstants::SIMD::MIN_SIMD_SIZE) {
         // Fallback for small content
         return std::string_view(data, std::min(len, size_t(100))).find('<') != std::string_view::npos;
     }
     
     // AVX2-accelerated HTML tag detection
     const __m256i html_mask = _mm256_set1_epi8('<');
-    const size_t simd_end = (len / CHUNK_SIZE) * CHUNK_SIZE;
+    const size_t simd_end = (len / CrawlerConstants::SIMD::CHUNK_SIZE) * CrawlerConstants::SIMD::CHUNK_SIZE;
     
-    for (size_t i = 0; i < simd_end; i += CHUNK_SIZE) {
+    for (size_t i = 0; i < simd_end; i += CrawlerConstants::SIMD::CHUNK_SIZE) {
         __m256i chunk = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(data + i));
         __m256i cmp = _mm256_cmpeq_epi8(chunk, html_mask);
         
@@ -95,11 +96,11 @@ bool SIMDPrefilter::is_html_content(const char* data, size_t len) const {
 }
 
 size_t SIMDPrefilter::estimate_link_count(const char* data, size_t len) const {
-    if (!g_simd_enabled || len < 32) {
+    if (!g_simd_enabled || len < CrawlerConstants::SIMD::MIN_SIMD_SIZE) {
         // Simple fallback - look for <a href patterns
         size_t count = 0;
         const char* pos = data;
-        const char* end = data + len - 6; // Need at least 6 chars for "<a href"
+        const char* end = data + len - CrawlerConstants::SIMD::MIN_HREF_SIZE; // Need at least 6 chars for "<a href"
         
         while (pos < end) {
             pos = static_cast<const char*>(std::memchr(pos, '<', end - pos));
@@ -109,11 +110,12 @@ size_t SIMDPrefilter::estimate_link_count(const char* data, size_t len) const {
                 (pos[2] == ' ' || pos[2] == '\t' || pos[2] == '\n' || pos[2] == '\r')) {
                 // Found <a with whitespace, look for href
                 const char* href_pos = pos + 2;
-                const char* href_end = std::min(href_pos + 50, end); // Search within 50 chars
+                const char* href_end = std::min(href_pos + CrawlerConstants::SIMD::HREF_SEARCH_WINDOW, end); // Search within configured window
                 while (href_pos < href_end && (*href_pos == ' ' || *href_pos == '\t' || *href_pos == '\n' || *href_pos == '\r')) href_pos++;
                 
-                if (href_pos + 4 < href_end && 
-                    (std::strncmp(href_pos, "href", 4) == 0 || std::strncmp(href_pos, "HREF", 4) == 0)) {
+                if (href_pos + CrawlerConstants::SIMD::HREF_PATTERN_SIZE < href_end && 
+                    (std::strncmp(href_pos, "href", CrawlerConstants::SIMD::HREF_PATTERN_SIZE) == 0 || 
+                     std::strncmp(href_pos, "HREF", CrawlerConstants::SIMD::HREF_PATTERN_SIZE) == 0)) {
                     count++;
                 }
             }
@@ -125,9 +127,10 @@ size_t SIMDPrefilter::estimate_link_count(const char* data, size_t len) const {
     // AVX2-accelerated <a href pattern detection
     const __m256i open_bracket = _mm256_set1_epi8('<');
     size_t count = 0;
-    const size_t simd_end = (len >= 35) ? len - 35 : 0;
+    const size_t simd_end = (len >= CrawlerConstants::SIMD::SIMD_LOOKAHEAD) ? 
+                           len - CrawlerConstants::SIMD::SIMD_LOOKAHEAD : 0;
     
-    for (size_t i = 0; i < simd_end; i += CHUNK_SIZE) {
+    for (size_t i = 0; i < simd_end; i += CrawlerConstants::SIMD::CHUNK_SIZE) {
         __m256i chunk = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(data + i));
         __m256i cmp = _mm256_cmpeq_epi8(chunk, open_bracket);
         uint32_t mask = _mm256_movemask_epi8(cmp);
@@ -159,29 +162,30 @@ size_t SIMDPrefilter::estimate_link_count(const char* data, size_t len) const {
 }
 
 bool SIMDPrefilter::is_quality_content(const char* data, size_t len) const {
-    if (len < 1000 || len > 5 * 1024 * 1024) return false;
+    if (len < CrawlerConstants::ContentFilter::MIN_CONTENT_SIZE || 
+        len > CrawlerConstants::ContentFilter::MAX_CONTENT_SIZE) return false;
     
     // Check for basic HTML structure
-    bool has_doctype = (std::search(data, data + std::min(len, size_t(500)), 
-                                   "<!DOCTYPE", "<!DOCTYPE" + 9) != data + std::min(len, size_t(500))) ||
-                      (std::search(data, data + std::min(len, size_t(500)), 
-                                   "<!doctype", "<!doctype" + 9) != data + std::min(len, size_t(500)));
+    bool has_doctype = (std::search(data, data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE), 
+                                   "<!DOCTYPE", "<!DOCTYPE" + 9) != data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE)) ||
+                      (std::search(data, data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE), 
+                                   "<!doctype", "<!doctype" + 9) != data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE));
     
-    bool has_html_tag = (std::search(data, data + std::min(len, size_t(500)), 
-                                    "<html", "<html" + 5) != data + std::min(len, size_t(500))) ||
-                       (std::search(data, data + std::min(len, size_t(500)), 
-                                    "<HTML", "<HTML" + 5) != data + std::min(len, size_t(500)));
+    bool has_html_tag = (std::search(data, data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE), 
+                                    "<html", "<html" + 5) != data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE)) ||
+                       (std::search(data, data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE), 
+                                    "<HTML", "<HTML" + 5) != data + std::min(len, (size_t)CrawlerConstants::ContentFilter::HTML_STRUCTURE_CHECK_SIZE));
     
     if (!has_doctype && !has_html_tag) return false;
     
     // Estimate link count
     size_t link_count = estimate_link_count(data, len);
-    if (link_count < 2) return false;
+    if (link_count < CrawlerConstants::ContentFilter::QUALITY_MIN_LINKS) return false;
     
     // Quick text content check - look for reasonable amount of text
     size_t text_chars = 0;
     bool in_tag = false;
-    const char* end = data + std::min(len, size_t(5000)); // Check first 5KB for speed
+    const char* end = data + std::min(len, (size_t)CrawlerConstants::ContentFilter::QUALITY_CHECK_SIZE); // Check first configured KB for speed
     
     for (const char* p = data; p < end; ++p) {
         if (*p == '<') in_tag = true;
@@ -189,7 +193,7 @@ bool SIMDPrefilter::is_quality_content(const char* data, size_t len) const {
         else if (!in_tag && std::isalnum(*p)) text_chars++;
     }
     
-    return text_chars > 300; // At least 300 text characters in first 5KB
+    return text_chars > CrawlerConstants::ContentFilter::QUALITY_MIN_TEXT_CHARS; // At least configured text characters
 }
 
 std::string_view SIMDPrefilter::filter_noise(const char* data, size_t len, char* output_buffer) const {
@@ -584,4 +588,3 @@ void UltraHTMLParser::enable_simd_acceleration(bool enable) {
 }
 
 } // namespace UltraParser
-    

@@ -4,6 +4,7 @@
 
 #include "crawler_main.h"
 #include "ultra_parser.h"
+#include "constants.h"
 #include <fstream>
 #include <atomic>
 #include <thread>
@@ -164,13 +165,15 @@ public:
         size_t total_links = all_links.size();
         size_t extract_count;
         
-        if (total_links <= 10) {
-            // Very few links, extract up to 50
-            extract_count = std::min(total_links, (size_t)50);
+        if (total_links <= CrawlerConstants::LinkExtraction::MIN_LINKS_FOR_EXTRACTION) {
+            // Very few links, extract up to minimum
+            extract_count = std::min(total_links, (size_t)CrawlerConstants::LinkExtraction::MIN_LINKS_EXTRACT);
         } else {
-            // Many links, extract 40% but at least 50, max 200
-            size_t forty_percent = total_links * 0.4;
-            extract_count = std::min((size_t)200, std::max((size_t)50, forty_percent));
+            // Many links, extract percentage but at least min, max configured amount
+            size_t percentage_count = total_links * CrawlerConstants::LinkExtraction::EXTRACTION_PERCENTAGE;
+            extract_count = std::min((size_t)CrawlerConstants::LinkExtraction::MAX_LINKS_EXTRACT, 
+                                   std::max((size_t)CrawlerConstants::LinkExtraction::MIN_LINKS_EXTRACT, 
+                                          percentage_count));
         }
         
         // Filter and collect valid links
@@ -304,18 +307,18 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
     }
     
     // Configure multi handle for maximum performance
-    curl_multi_setopt(multi_handle, CURLMOPT_MAXCONNECTS, 100);
-    curl_multi_setopt(multi_handle, CURLMOPT_MAX_TOTAL_CONNECTIONS, 100);
-    curl_multi_setopt(multi_handle, CURLMOPT_MAX_HOST_CONNECTIONS, 8); // Respect server limits
+    curl_multi_setopt(multi_handle, CURLMOPT_MAXCONNECTS, CrawlerConstants::Network::MAX_CONNECTIONS);
+    curl_multi_setopt(multi_handle, CURLMOPT_MAX_TOTAL_CONNECTIONS, CrawlerConstants::Network::MAX_CONNECTIONS);
+    curl_multi_setopt(multi_handle, CURLMOPT_MAX_HOST_CONNECTIONS, CrawlerConstants::Network::MAX_HOST_CONNECTIONS);
     curl_multi_setopt(multi_handle, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
     
     // Set up global DNS cache
     CURLSH* share_handle = curl_share_init();
     curl_share_setopt(share_handle, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
     
-    // Active requests management - reduced to prevent queue over-consumption
+    // Active requests management
     std::unordered_map<CURL*, std::unique_ptr<MultiRequestContext>> active_requests;
-    const int MAX_CONCURRENT = 25; // Reduced from 50 to 25 to prevent queue starvation
+    const int MAX_CONCURRENT = CrawlerConstants::Queue::MAX_CONCURRENT_REQUESTS;
     
     // Batch processing
     std::vector<std::pair<std::string, std::string>> batch_buffer;
@@ -336,8 +339,9 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
     while (!stop_flag) {
         auto loop_start = std::chrono::steady_clock::now();
         
-        // Log queue drain diagnostics every 10 seconds per worker
-        if (std::chrono::duration_cast<std::chrono::seconds>(loop_start - last_queue_check).count() >= 10) {
+        // Log queue drain diagnostics every configured interval
+        if (std::chrono::duration_cast<std::chrono::seconds>(loop_start - last_queue_check).count() >= 
+            CrawlerConstants::Monitoring::WORKER_DIAGNOSTICS_INTERVAL_SECONDS) {
             size_t current_queue_size = url_frontier->size();
             std::cout << "🔍 Worker " << worker_id << " diagnostics: "
                      << "Queue=" << current_queue_size 
@@ -352,7 +356,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
         
         // Add new requests up to the limit - Phase 2: with work stealing
         int attempts = 0;
-        const int MAX_ATTEMPTS = 100;
+        const int MAX_ATTEMPTS = CrawlerConstants::Queue::MAX_QUEUE_DRAIN_ATTEMPTS;
         while (active_requests.size() < MAX_CONCURRENT && !stop_flag && attempts < MAX_ATTEMPTS) {
             UrlInfo url_info("", 0.0f);
             attempts++;
@@ -374,15 +378,13 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
             }
             // 4. Try loading from sharded disk queue
             else {
-                auto disk_urls = sharded_disk_queue->load_urls_from_disk(50);
-                if (!disk_urls.empty()) {
-                    // Use first URL and re-queue the rest
-                    url_info = UrlInfo(disk_urls[0], 0.7f, 0);
+                auto disk_urls = sharded_disk_queue->load_urls_from_disk(CrawlerConstants::Queue::SHARDED_DISK_LOAD_SIZE);
+                if (!disk_urls.empty()) {                // Use first URL and re-queue the rest
+                url_info = UrlInfo(disk_urls[0], CrawlerConstants::Priority::DISK_URL_PRIORITY, 0);
                     found_url = true;
-                    
-                    // Re-queue remaining URLs
-                    for (size_t i = 1; i < disk_urls.size(); ++i) {
-                        UrlInfo disk_url(disk_urls[i], 0.7f, 0);
+                         // Re-queue remaining URLs
+                for (size_t i = 1; i < disk_urls.size(); ++i) {
+                    UrlInfo disk_url(disk_urls[i], CrawlerConstants::Priority::DISK_URL_PRIORITY, 0);
                         if (!url_frontier->enqueue(disk_url)) {
                             work_stealing_queue->push_local(worker_id, disk_url);
                         }
@@ -393,7 +395,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
             if (!found_url) {
                 static int empty_queue_count = 0;
                 empty_queue_count++;
-                if (empty_queue_count % 1000 == 1) {
+                if (empty_queue_count % CrawlerConstants::Monitoring::EMPTY_QUEUE_LOG_FREQUENCY == 1) {
                     std::cout << "⚠️ Worker " << worker_id << " exhausted all URL sources (count: " << empty_queue_count << ")\n";
                 }
                 break;
@@ -431,7 +433,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                 static thread_local std::unordered_map<std::string, std::queue<UrlInfo>> domain_queues;
                 
                 // Instead of re-queuing in the main frontier, store in domain-specific queue
-                if (domain_queues[domain].size() < 100) { // Limit per-domain queue size
+                if (domain_queues[domain].size() < CrawlerConstants::Queue::DOMAIN_QUEUE_LIMIT) {
                     domain_queues[domain].push(url_info);
                 } else {
                     // If domain queue is full, re-queue in main frontier
@@ -470,23 +472,23 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
             curl_easy_setopt(ctx->curl_handle, CURLOPT_WRITEDATA, &ctx->response_data);
             
             // Performance optimizations - balanced timeouts
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_TIMEOUT, 10L);           // Increased back to 10s
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_CONNECTTIMEOUT, 4L);      // Increased back to 4s
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_FOLLOWLOCATION, 1L);     // Follow redirects
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_MAXREDIRS, 3L);          // Max redirects
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_NOSIGNAL, 1L);           // Thread-safe
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_TCP_NODELAY, 1L);        // Disable Nagle
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_TCP_KEEPALIVE, 1L);      // Keep connections alive
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_TIMEOUT, CrawlerConstants::Network::TIMEOUT_SECONDS);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_CONNECTTIMEOUT, CrawlerConstants::Network::CONNECT_TIMEOUT_SECONDS);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_FOLLOWLOCATION, CrawlerConstants::Security::FOLLOW_REDIRECTS);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_MAXREDIRS, CrawlerConstants::Network::MAX_REDIRECTS);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_NOSIGNAL, CrawlerConstants::Security::THREAD_SAFE_MODE);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_TCP_NODELAY, CrawlerConstants::Security::TCP_NODELAY);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_TCP_KEEPALIVE, CrawlerConstants::Security::TCP_KEEPALIVE);
             curl_easy_setopt(ctx->curl_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0); // HTTP/2
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_BUFFERSIZE, 131072L);    // 128KB buffer
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_ACCEPT_ENCODING, "gzip, deflate"); // Compression
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_BUFFERSIZE, CrawlerConstants::Network::BUFFER_SIZE);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_ACCEPT_ENCODING, CrawlerConstants::Headers::ACCEPT_ENCODING);
             
             // Production headers
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_USERAGENT, "AISearchBot/1.0 (+https://example.com/bot)");
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_USERAGENT, CrawlerConstants::Headers::USER_AGENT);
             
             // SSL settings for production
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_SSL_VERIFYHOST, 2L);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_SSL_VERIFYPEER, CrawlerConstants::Security::SSL_VERIFY_PEER);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_SSL_VERIFYHOST, CrawlerConstants::Security::SSL_VERIFY_HOST);
             
             // Add to multi handle
             CURLMcode mc = curl_multi_add_handle(multi_handle, ctx->curl_handle);
@@ -534,7 +536,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                         global_monitor.add_bytes(static_cast<long>(download_size));
                         
                         // Process successful response
-                        if (http_code == 200 && !ctx->response_data.empty()) {
+                        if (http_code == CrawlerConstants::HttpStatus::OK && !ctx->response_data.empty()) {
                             // Validate content quality
                             if (ContentFilter::is_high_quality_content(ctx->response_data)) {
                                 pages_processed++;
@@ -551,10 +553,9 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                                 batch_buffer.emplace_back(ctx->url, ctx->response_data);
                                 
                                 // Save batch when it reaches optimal size
-                                if (batch_buffer.size() >= 25) { // Smaller batches for faster I/O
+                                if (batch_buffer.size() >= CrawlerConstants::Storage::BATCH_SIZE)
                                     file_storage->save_html_batch(batch_buffer);
                                     batch_buffer.clear();
-                                }
                                 
                                 // PHASE 2: Pipeline HTML processing instead of blocking here
                                 if (ctx->url_info.depth < 5 && HtmlParser::is_html_content(ctx->response_data)) {
@@ -584,10 +585,11 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                                     }
                                 }
                             }
-                        } else if (http_code == 429 || http_code == 503) {
+                        } else if (http_code == CrawlerConstants::HttpStatus::TOO_MANY_REQUESTS || 
+                                  http_code == CrawlerConstants::HttpStatus::SERVICE_UNAVAILABLE) {
                             // Handle rate limiting from server
-                            limiter.throttle_domain(ctx->domain, 120); // 2 minute throttle
-                        } else if (http_code >= 400) {
+                            limiter.throttle_domain(ctx->domain, CrawlerConstants::Network::THROTTLE_DURATION_SECONDS);
+                        } else if (http_code >= CrawlerConstants::HttpStatus::BAD_REQUEST) {
                             crawl_logger->log_error(ctx->url, "HTTP " + std::to_string(http_code));
                         }
                     } else {
@@ -618,7 +620,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
         }
         
         // Periodic progress reporting - reduced frequency for performance
-        if (pages_processed % 500 == 0 && pages_processed > 0) {
+        if (pages_processed % CrawlerConstants::Monitoring::PROGRESS_REPORT_FREQUENCY == 0 && pages_processed > 0) {
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - worker_start).count();
             if (elapsed > 0) {
@@ -685,7 +687,7 @@ void html_processing_worker(int worker_id, RobotsTxtCache& robots) {
             batches_processed++;
             
             // Periodic progress for HTML processors
-            if (batches_processed % 100 == 0) {
+            if (batches_processed % CrawlerConstants::Monitoring::PROGRESS_REPORT_FREQUENCY/5 == 0) {
                 auto now = std::chrono::steady_clock::now();
                 auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - worker_start).count();
                 if (elapsed > 0) {
@@ -762,7 +764,8 @@ private:
     }
     
 public:
-    static bool inject_emergency_seeds(int& injection_count, const int max_injections = 5) {
+    static bool inject_emergency_seeds(int& injection_count, 
+                                       const int max_injections = CrawlerConstants::ErrorHandling::MAX_EMERGENCY_INJECTIONS) {
         if (injection_count >= max_injections) {
             return false;
         }
@@ -771,7 +774,7 @@ public:
         int injected = 0;
         
         for (const auto& seed : seeds) {
-            float priority = 0.9f; // Very high priority for emergency seeds
+            float priority = CrawlerConstants::Priority::EMERGENCY_SEED_PRIORITY; // Very high priority for emergency seeds
             UrlInfo seed_info(seed, priority, 0);
             if (url_frontier->enqueue(seed_info)) {
                 injected++;
@@ -810,7 +813,7 @@ void enhanced_monitoring_thread() {
     std::cout << "   Total Available: " << (initial_queue_size + initial_disk_queue_size + initial_work_stealing_size) << " URLs\n\n";
     
     while (!stop_flag) {
-        std::this_thread::sleep_for(std::chrono::seconds(5));  // More frequent monitoring for diagnostics
+        std::this_thread::sleep_for(std::chrono::seconds(CrawlerConstants::Monitoring::QUEUE_CHECK_INTERVAL_SECONDS));
         
         auto now = std::chrono::steady_clock::now();
         auto elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(now - monitoring_start).count();
@@ -831,25 +834,26 @@ void enhanced_monitoring_thread() {
                  << " | Speed: " << std::fixed << std::setprecision(1) << std::setw(6) << current_rate << " p/s"
                  << " | Total: " << std::setw(6) << total_processed << "\n";
         
-        // Print detailed statistics every 15 seconds
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_stats).count() >= 15) {
+        // Print detailed statistics every configured interval
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_stats).count() >= 
+            CrawlerConstants::Monitoring::DETAILED_STATS_INTERVAL_SECONDS) {
             std::cout << "\n📊 DETAILED STATS (15s interval):\n";
             global_monitor.print_stats(queue_size, 0);
             
             // Performance indicators with more granular feedback
-            if (current_rate >= 300.0) {
+            if (current_rate >= CrawlerConstants::Performance::TARGET_PAGES_PER_SECOND) {
                 std::cout << "🚀 TARGET ACHIEVED: " << std::fixed << std::setprecision(1) 
                          << current_rate << " pages/sec\n";
-            } else if (current_rate >= 200.0) {
+            } else if (current_rate >= CrawlerConstants::Performance::HIGH_PERFORMANCE_THRESHOLD) {
                 std::cout << "⚡ High Performance: " << std::fixed << std::setprecision(1) 
                          << current_rate << " pages/sec\n";
-            } else if (current_rate >= 100.0) {
+            } else if (current_rate >= CrawlerConstants::Performance::GOOD_PERFORMANCE_THRESHOLD) {
                 std::cout << "🔥 Good Performance: " << std::fixed << std::setprecision(1) 
                          << current_rate << " pages/sec\n";
-            } else if (current_rate >= 50.0) {
+            } else if (current_rate >= CrawlerConstants::Performance::MODERATE_PERFORMANCE_THRESHOLD) {
                 std::cout << "⚠️ Moderate Performance: " << std::fixed << std::setprecision(1) 
                          << current_rate << " pages/sec\n";
-            } else if (current_rate >= 10.0) {
+            } else if (current_rate >= CrawlerConstants::Performance::LOW_PERFORMANCE_THRESHOLD) {
                 std::cout << "🐌 Low Performance: " << std::fixed << std::setprecision(1) 
                          << current_rate << " pages/sec\n";
             } else {
@@ -865,12 +869,12 @@ void enhanced_monitoring_thread() {
         // 🔄 PHASE 2: ENHANCED QUEUE MANAGEMENT with sharded disk and work stealing
         
         // 1. Refill from sharded disk when main queue gets low
-        if (queue_size < 500 && disk_queue_size > 0) {
-            auto loaded_urls = sharded_disk_queue->load_urls_from_disk(500);
+        if (queue_size < CrawlerConstants::Queue::REFILL_THRESHOLD && disk_queue_size > 0) {
+            auto loaded_urls = sharded_disk_queue->load_urls_from_disk(CrawlerConstants::Queue::REFILL_THRESHOLD);
             int refilled = 0;
             
             for (const auto& url : loaded_urls) {
-                float priority = 0.7f;
+                float priority = CrawlerConstants::Priority::DISK_URL_PRIORITY;
                 UrlInfo url_info(url, priority, 0);
                 if (url_frontier->enqueue(url_info)) {
                     refilled++;
@@ -883,15 +887,16 @@ void enhanced_monitoring_thread() {
         }
         
         // 2. Periodic cleanup of empty disk shards
-        if (elapsed_seconds % 60 == 0) { // Every minute
+        if (elapsed_seconds % CrawlerConstants::Monitoring::CLEANUP_INTERVAL_SECONDS == 0) { // Every minute
             sharded_disk_queue->cleanup_empty_shards();
         }
         
         // 2. Emergency seed injection when critically low - more aggressive
-        if (queue_size < 100 && current_rate < 5.0) {  // Increased threshold from 20 to 100
+        if (queue_size < CrawlerConstants::Queue::LOW_QUEUE_THRESHOLD && 
+            current_rate < CrawlerConstants::Performance::SHUTDOWN_RATE_THRESHOLD) {
             low_queue_warnings++;
             
-            if (low_queue_warnings >= 2) { // Reduced from 3 to 2 warnings
+            if (low_queue_warnings >= CrawlerConstants::ErrorHandling::LOW_QUEUE_WARNING_THRESHOLD) {
                 if (EmergencySeedInjector::inject_emergency_seeds(emergency_injection_count)) {
                     low_queue_warnings = 0; // Reset warnings after injection
                 }
@@ -902,25 +907,28 @@ void enhanced_monitoring_thread() {
         
         // 3. Auto-shutdown conditions - Phase 2 enhanced
         size_t total_urls_available = queue_size + disk_queue_size + work_stealing_size;
-        if (total_urls_available < 10 && current_rate < 2.0) {
+        if (total_urls_available < CrawlerConstants::Queue::CRITICAL_QUEUE_THRESHOLD && 
+            current_rate < CrawlerConstants::Performance::VERY_LOW_PERFORMANCE_THRESHOLD) {
             static int shutdown_warnings = 0;
             shutdown_warnings++;
             
             std::cout << "🛑 Shutdown condition detected: Total URLs=" << total_urls_available
                      << " (Main=" << queue_size << ", Disk=" << disk_queue_size 
                      << ", Work=" << work_stealing_size << "), Rate=" << current_rate 
-                     << " (warning #" << shutdown_warnings << "/3)\n";
+                     << " (warning #" << shutdown_warnings << "/" 
+                     << CrawlerConstants::ErrorHandling::SHUTDOWN_WARNING_THRESHOLD << ")\n";
             
-            if (shutdown_warnings >= 3) {
+            if (shutdown_warnings >= CrawlerConstants::ErrorHandling::SHUTDOWN_WARNING_THRESHOLD) {
                 std::cout << "🏁 Triggering graceful shutdown - no more URLs to crawl\n";
                 stop_flag = true;
             }
         }
         
-        // Safety timeout (30 minutes)
+        // Safety timeout (configurable)
         auto total_elapsed = std::chrono::duration_cast<std::chrono::minutes>(now - last_cleanup).count();
-        if (total_elapsed >= 30) {
-            std::cout << "⏰ Safety timeout reached (30 minutes). Shutting down...\n";
+        if (total_elapsed >= CrawlerConstants::Monitoring::SAFETY_TIMEOUT_MINUTES) {
+            std::cout << "⏰ Safety timeout reached (" << CrawlerConstants::Monitoring::SAFETY_TIMEOUT_MINUTES 
+                     << " minutes). Shutting down...\n";
             stop_flag = true;
         }
     }
@@ -939,9 +947,10 @@ int main(int argc, char* argv[]) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     
     // Parse command line arguments - Phase 2: Optimal configuration
-    int max_threads = std::min(4, (int)std::thread::hardware_concurrency()); // Reduced for network-bound workload
-    int max_depth = 4;
-    int max_queue_size = 200000;
+    int max_threads = std::min(CrawlerConstants::Workers::DEFAULT_MAX_THREADS, 
+                              (int)std::thread::hardware_concurrency());
+    int max_depth = CrawlerConstants::Queue::DEFAULT_MAX_DEPTH;
+    int max_queue_size = CrawlerConstants::Queue::DEFAULT_MAX_QUEUE_SIZE;
     
     if (argc > 1) max_threads = std::atoi(argv[1]);
     if (argc > 2) max_depth = std::atoi(argv[2]);
@@ -949,14 +958,15 @@ int main(int argc, char* argv[]) {
     
     // Phase 2: Calculate optimal worker distribution
     int network_workers = max_threads;
-    int html_workers = std::max(1, max_threads / 2); // Fewer HTML workers needed
+    int html_workers = std::max(CrawlerConstants::Workers::MIN_HTML_WORKERS, 
+                               max_threads / CrawlerConstants::Workers::HTML_WORKER_RATIO);
     
     std::cout << "Configuration - Phase 2 Enhanced:\n";
     std::cout << "- Network workers: " << network_workers << "\n";
     std::cout << "- HTML processors: " << html_workers << "\n";
     std::cout << "- Max crawl depth: " << max_depth << "\n";
     std::cout << "- Max queue size: " << max_queue_size << "\n";
-    std::cout << "- Target performance: 300+ pages/sec\n";
+    std::cout << "- Target performance: " << CrawlerConstants::Performance::TARGET_PAGES_PER_SECOND << "+ pages/sec\n";
     std::cout << "- Phase 2 features: Sharded disk, Work stealing, HTML pipeline\n";
     std::cout << "================================================================\n\n";
     
@@ -966,14 +976,14 @@ int main(int argc, char* argv[]) {
     url_frontier->set_max_queue_size(max_queue_size);
     
     crawl_logger = std::make_unique<CrawlLogger>(
-        "../data/processed/hybrid_crawl_metadata.db",
-        "../data/processed/hybrid_crawl_log.csv"
+        CrawlerConstants::Paths::DB_PATH,
+        CrawlerConstants::Paths::LOG_PATH
     );
     
-    file_storage = std::make_unique<FileStorageManager>("../data/raw");
+    file_storage = std::make_unique<FileStorageManager>(CrawlerConstants::Paths::RAW_DATA_PATH);
     
     // Phase 2: Initialize enhanced components
-    sharded_disk_queue = std::make_unique<ShardedDiskQueue>("../data");
+    sharded_disk_queue = std::make_unique<ShardedDiskQueue>(CrawlerConstants::Paths::SHARDED_DISK_PATH);
     html_processing_queue = std::make_unique<HtmlProcessingQueue>();
     work_stealing_queue = std::make_unique<WorkStealingQueue>(network_workers);
     domain_manager = std::make_unique<DynamicDomainManager>();
@@ -985,7 +995,7 @@ int main(int argc, char* argv[]) {
     ErrorTracker error_tracker;
     
     // Load blacklist if available
-    blacklist.load_from_file("../config/blacklist.txt");
+    blacklist.load_from_file(CrawlerConstants::Paths::BLACKLIST_PATH);
     
     // High-quality seed URLs optimized for speed and variety - EXPANDED
     const std::vector<std::string> seed_urls = {
@@ -1058,7 +1068,7 @@ int main(int argc, char* argv[]) {
     std::cout << "   Memory Queue: " << post_seed_queue_size << " URLs\n";
     std::cout << "   Sharded Disk Queue: " << post_seed_disk_size << " URLs\n";
     std::cout << "   Work Stealing Queue: " << work_stealing_queue->total_size() << " URLs\n";
-    std::cout << "   Total Available: " << (post_seed_queue_size + post_seed_disk_size) << " URLs\n\n";
+    std::cout << "   HTML Processing Queue: " << html_processing_queue->size() << " tasks\n";
     
     // Register signal handler
     std::signal(SIGINT, signal_handler);

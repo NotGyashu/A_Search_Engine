@@ -8,6 +8,7 @@
  * Stage 3: Targeted DOM Extraction (Links only)
  */
 
+#include "constants.h"
 #include <immintrin.h>
 #include <string_view>
 #include <string>
@@ -29,7 +30,7 @@ namespace UltraParser {
 
 class SIMDPrefilter {
 private:
-    static constexpr size_t CHUNK_SIZE = 32; // AVX2 256-bit chunks
+    static constexpr size_t CHUNK_SIZE = CrawlerConstants::SIMD::CHUNK_SIZE; // AVX2 256-bit chunks
     
 #if HAVE_HYPERSCAN
     hs_database_t* noise_filter_db_ = nullptr;
@@ -207,7 +208,7 @@ private:
     size_t position_ = 0;
     
 public:
-    explicit MemoryPool(size_t size = 1024 * 1024) : buffer_(size) {} // 1MB pool
+    explicit MemoryPool(size_t size = CrawlerConstants::SIMD::MEMORY_POOL_SIZE) : buffer_(size) {} // Configurable memory pool
     
     char* allocate(size_t size) {
         if (position_ + size > buffer_.size()) {

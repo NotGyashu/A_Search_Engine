@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "constants.h"
 #include "ultra_parser.h"
 #include <curl/curl.h>
 #include <iostream>
@@ -142,9 +143,10 @@
                     delay_str.erase(0, delay_str.find_first_not_of(" \t"));
                     try {
                         int delay = std::stoi(delay_str);
-                        rule.crawl_delay_ms = std::max(200, delay * 1000); // Convert to ms, min 200ms
+                        rule.crawl_delay_ms = std::max(CrawlerConstants::RateLimit::MIN_ROBOTS_DELAY_MS, 
+                                                      delay * 1000); // Convert to ms, min configured ms
                     } catch (...) {
-                        rule.crawl_delay_ms = 200; // Default
+                        rule.crawl_delay_ms = CrawlerConstants::RateLimit::DEFAULT_CRAWL_DELAY_MS; // Default
                     }
                 }
             }
@@ -167,7 +169,7 @@
         // Set permissive default immediately for maximum speed
         RobotRule default_rule;
         default_rule.allow_all = true;
-        default_rule.crawl_delay_ms = 10; // Very fast crawling
+        default_rule.crawl_delay_ms = CrawlerConstants::RateLimit::MIN_CRAWL_DELAY_MS; // Very fast crawling
         rules_[domain] = default_rule;
         fetch_times_[domain] = std::chrono::steady_clock::now();
         
@@ -215,7 +217,10 @@
         
         // Adaptive delay based on failures (2-20ms range)
         int failures = failure_counts_[shard].load(std::memory_order_relaxed);
-        int64_t delay_ns = (2 + std::min(failures * 2, 18)) * 1'000'000; // 2-20ms in nanoseconds
+        int64_t delay_ns = (CrawlerConstants::RateLimit::BASE_BACKOFF_MS + 
+                           std::min(failures * CrawlerConstants::RateLimit::BACKOFF_MULTIPLIER, 
+                                   CrawlerConstants::RateLimit::MAX_BACKOFF_MS)) * 
+                          CrawlerConstants::RateLimit::NANOSECONDS_PER_MILLISECOND;
         
         int64_t required_gap = now - last;
         if (required_gap < delay_ns) {
@@ -419,7 +424,8 @@
         std::string domain = UrlNormalizer::extract_domain(url);
         
         // Base priority decreases with depth
-        float priority = std::max(0.1f, 1.0f - (depth * 0.15f));
+        float priority = std::max(CrawlerConstants::Priority::MIN_PRIORITY, 
+                                 1.0f - (depth * CrawlerConstants::Priority::DEPTH_PENALTY));
         
         // High priority domains
         if (high_priority_domains_.find(domain) != high_priority_domains_.end()) {
@@ -441,12 +447,12 @@
             priority *= 0.8f;
         }
         
-        return std::min(priority, 2.0f); // Cap at 2.0
+        return std::min(priority, CrawlerConstants::Priority::MAX_PRIORITY); // Cap at configured max
     }
 
     bool ContentFilter::is_high_quality_content(const std::string& html) {
-        if (html.length() < 500) return false; // Too short
-        if (html.length() > 10 * 1024 * 1024) return false; // Too large
+        if (html.length() < CrawlerConstants::ContentFilter::MIN_CONTENT_SIZE) return false; // Too short
+        if (html.length() > CrawlerConstants::ContentFilter::MAX_CONTENT_SIZE) return false; // Too large
         
         // Check for basic HTML structure
         if (html.find("<html") == std::string::npos && html.find("<!DOCTYPE") == std::string::npos) {
@@ -462,7 +468,7 @@
             else if (!in_tag && std::isalnum(c)) text_content++;
         }
         
-        return text_content > 200; // At least 200 alphanumeric characters
+        return text_content > CrawlerConstants::ContentFilter::MIN_TEXT_CHARACTERS; // At least configured alphanumeric characters
     }
 
     // ============= HtmlParser Implementation =============

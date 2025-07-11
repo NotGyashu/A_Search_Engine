@@ -6,11 +6,15 @@ venv
 # Data files
 data/raw/
 data/index/
-
+*json
+**/data/**
+crawler/data/
+data/
 # System files
 .DS_Store
 *.swp
 *.swo
+*.txt
 
 # IDE specific
 .vscode/
