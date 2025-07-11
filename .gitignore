@@ -8,7 +8,7 @@ data/raw/
 data/index/
 *json
 **/data/**
-crawler/data/
+crawler/data/*
 data/
 # System files
 .DS_Store

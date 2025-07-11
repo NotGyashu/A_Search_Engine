@@ -23,15 +23,15 @@ namespace Workers {
 // =============== QUEUE CONFIGURATION ===============
 namespace Queue {
     constexpr int DEFAULT_MAX_DEPTH = 4;                // Default crawl depth
-    constexpr int DEFAULT_MAX_QUEUE_SIZE = 200000;      // Default main queue size
-    constexpr int MAX_CONCURRENT_REQUESTS = 25;         // Max concurrent requests per worker
+    constexpr int DEFAULT_MAX_QUEUE_SIZE = 500000;      // Default main queue size
+    constexpr int MAX_CONCURRENT_REQUESTS = 50;         // Max concurrent requests per worker
     constexpr int MAX_QUEUE_DRAIN_ATTEMPTS = 100;       // Max attempts to drain queue
     constexpr int DISK_LOAD_BATCH_SIZE = 200;           // URLs loaded from disk per batch
-    constexpr int REFILL_THRESHOLD = 500;               // Refill main queue when below this
+    constexpr int REFILL_THRESHOLD = 1000;               // Refill main queue when below this
     constexpr int LOW_QUEUE_THRESHOLD = 100;            // Trigger emergency seeds
     constexpr int CRITICAL_QUEUE_THRESHOLD = 10;        // Auto-shutdown threshold
     constexpr int DOMAIN_QUEUE_LIMIT = 100;             // Per-domain queue size limit
-    constexpr int SHARDED_DISK_LOAD_SIZE = 50;          // Sharded disk load batch size
+    constexpr int SHARDED_DISK_LOAD_SIZE = 100;          // Sharded disk load batch size
 }
 
 // =============== LINK EXTRACTION ===============
