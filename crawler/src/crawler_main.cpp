@@ -2,9 +2,8 @@
 // Combines CURL Multi-interface speed with enterprise-grade features
 // Target: 300+ pages/sec with full compliance and robustness
 
-#include "utils.h"
-#include <curl/curl.h>
-#include <gumbo.h>
+#include "crawler_main.h"
+#include "ultra_parser.h"
 #include <fstream>
 #include <atomic>
 #include <thread>
@@ -22,7 +21,7 @@
 #include <unordered_map>
 
 // Write callback for CURL
-static size_t hybrid_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
+size_t hybrid_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t total_size = size * nmemb;
     static_cast<std::string*>(userp)->append(static_cast<char*>(contents), total_size);
     return total_size;
@@ -157,8 +156,8 @@ std::unique_ptr<WorkStealingQueue> work_stealing_queue;
 class AdaptiveLinkExtractor {
 public:
     static std::vector<std::string> extract_links_adaptive(const std::string& html, const std::string& base_url) {
-        // Use the much faster streaming parser instead of Gumbo for 8x speedup
-        std::vector<std::string> all_links = HtmlParser::extract_links_streaming(html, base_url);
+        // Use the ultra parser for maximum speed (300+ pages/sec)
+        std::vector<std::string> all_links = HtmlParser::extract_links(html, base_url);
         std::vector<std::string> filtered_links;
         
         // Calculate adaptive extraction count
@@ -1130,7 +1129,11 @@ int main(int argc, char* argv[]) {
     std::cout << "\n🎯 FINAL PHASE 2 CRAWLER RESULTS\n";
     std::cout << "===================================\n";
     global_monitor.print_stats(url_frontier->size(), 0);
-    error_tracker.print_stats();
+   // error_tracker.print_stats();
+    
+    // Ultra parser performance stats (always shown now)
+    UltraParser::UltraHTMLParser ultra_parser;
+    ultra_parser.print_performance_stats();
     
     // Phase 2 final statistics
     std::cout << "📊 PHASE 2 QUEUE FINAL STATS:\n";

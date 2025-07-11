@@ -1,18 +1,17 @@
 #include "utils.h"
-    #include <curl/curl.h>
-    #include <iostream>
-    #include <fstream>
-    #include <regex>
-    #include <algorithm>
-    #include <thread>
-    #include <chrono>
-    #include <filesystem>
-    #include <queue>
-    #include <sstream>
-    #include <iomanip>
-    #include <random>
-    #include <gumbo.h>
-    #include <immintrin.h>  // For _mm_pause()
+#include "ultra_parser.h"
+#include <curl/curl.h>
+#include <iostream>
+#include <fstream>
+#include <algorithm>
+#include <thread>
+#include <chrono>
+#include <filesystem>
+#include <queue>
+#include <sstream>
+#include <iomanip>
+#include <random>
+#include <immintrin.h>  // For _mm_pause()
 
     // Additional performance optimizations
     #define LIKELY(x) __builtin_expect(!!(x), 1)
@@ -469,127 +468,22 @@
     // ============= HtmlParser Implementation =============
 
     std::vector<std::string> HtmlParser::extract_links(const std::string& html, const std::string& base_url) {
-        std::vector<std::string> links;
-        
-        // Use Gumbo parser for robust HTML parsing
-        GumboOutput* output = gumbo_parse(html.c_str());
-        if (!output || !output->root) {
-            return links;
-        }
-        
-        std::function<void(GumboNode*)> extract_recursive = [&](GumboNode* node) {
-            if (node->type != GUMBO_NODE_ELEMENT) return;
-            
-            if (node->v.element.tag == GUMBO_TAG_A) {
-                GumboAttribute* href = gumbo_get_attribute(&node->v.element.attributes, "href");
-                if (href && href->value) {
-                    std::string url = href->value;
-                    if (!url.empty() && url != "#") {
-                        // Resolve relative URLs
-                        if (url.find("://") == std::string::npos) {
-                            url = UrlNormalizer::resolve_relative(base_url, url);
-                        }
-                        url = UrlNormalizer::normalize(url);
-                        if (!url.empty() && UrlNormalizer::is_valid_url(url)) {
-                            links.push_back(url);
-                        }
-                    }
-                }
-            }
-            
-            // Recursively process child nodes
-            GumboVector* children = &node->v.element.children;
-            for (unsigned int i = 0; i < children->length; ++i) {
-                extract_recursive(static_cast<GumboNode*>(children->data[i]));
-            }
-        };
-        
-        extract_recursive(output->root);
-        gumbo_destroy_output(&kGumboDefaultOptions, output);
-        
-        return links;
+        // Always use ultra parser for maximum performance (300+ pages/sec)
+        return extract_links_ultra(html, base_url);
     }
 
-    std::vector<std::string> HtmlParser::extract_links_streaming(const std::string& html, const std::string& base_url) {
-        std::vector<std::string> links;
-        if (html.empty()) return links;
-        
-        // Fallback to regex-based extraction for maximum speed
-        // This is a fast streaming parser implementation that avoids full DOM construction
-        static std::regex href_regex(R"(<a\s+[^>]*href=["']([^"']+)["'][^>]*>)", std::regex::icase | std::regex::optimize);
-        
-        std::sregex_iterator it(html.begin(), html.end(), href_regex);
-        std::sregex_iterator end;
-        
-        while (it != end) {
-            std::string url = (*it)[1].str();
-            if (!url.empty() && url != "#") {
-                // Resolve relative URLs
-                if (url.find("://") == std::string::npos) {
-                    url = UrlNormalizer::resolve_relative(base_url, url);
-                }
-                url = UrlNormalizer::normalize(url);
-                if (!url.empty() && UrlNormalizer::is_valid_url(url)) {
-                    links.push_back(url);
-                }
-            }
-            ++it;
-        }
-        
-        return links;
+    // Ultra-fast SIMD parser implementation (300+ pages/sec target)
+    std::vector<std::string> HtmlParser::extract_links_ultra(const std::string& html, const std::string& base_url) {
+        static UltraParser::UltraHTMLParser ultra_parser;
+        return ultra_parser.extract_links_ultra(html, base_url);
     }
-
-    std::string HtmlParser::extract_title(const std::string& html) {
-        std::smatch match;
-        if (std::regex_search(html, match, title_regex_) && match.size() > 1) {
-            std::string title = match[1].str();
-            // Clean up whitespace
-            title.erase(0, title.find_first_not_of(" \t\n\r"));
-            title.erase(title.find_last_not_of(" \t\n\r") + 1);
-            return title;
-        }
-        return "";
-    }
-
-    std::string HtmlParser::extract_text_content(const std::string& html) {
-        std::string text;
-        bool in_tag = false;
-        bool in_script = false;
-        bool in_style = false;
-        
-        for (size_t i = 0; i < html.length(); ++i) {
-            if (html[i] == '<') {
-                in_tag = true;
-                // Check for script/style tags
-                if (i + 7 < html.length() && html.substr(i, 7) == "<script") {
-                    in_script = true;
-                } else if (i + 6 < html.length() && html.substr(i, 6) == "<style") {
-                    in_style = true;
-                }
-            } else if (html[i] == '>') {
-                in_tag = false;
-                // Check for closing script/style tags
-                if (in_script && i >= 8 && html.substr(i-8, 9) == "/script>") {
-                    in_script = false;
-                } else if (in_style && i >= 7 && html.substr(i-7, 8) == "/style>") {
-                    in_style = false;
-                }
-            } else if (!in_tag && !in_script && !in_style) {
-                text += html[i];
-            }
-        }
-        
-        return text;
-    }
-
-    bool HtmlParser::is_html_content(const std::string& content) {
-        std::string lower_content = content.substr(0, 1000); // Check first 1KB
-        std::transform(lower_content.begin(), lower_content.end(), lower_content.begin(), ::tolower);
-        
-        return lower_content.find("<html") != std::string::npos ||
-            lower_content.find("<!doctype html") != std::string::npos ||
-            lower_content.find("<head") != std::string::npos ||
-            lower_content.find("<body") != std::string::npos;
+    
+    void HtmlParser::get_parsing_stats() {
+        // Ultra parser performance stats are handled in UltraHTMLParser
+        std::cout << "\n========== ULTRA PARSER ONLY ==========\n";
+        std::cout << "Using ultra-fast SIMD parser for all HTML processing\n";
+        std::cout << "Target performance: 300+ pages/sec\n";
+        std::cout << "======================================\n";
     }
 
     // ============= PerformanceMonitor Implementation =============
@@ -669,13 +563,45 @@
                     if (i > 0) file << ",\n";
                     
                     const auto& [url, html] = batch.data[i];
-                    // Skip base64 encoding for performance during tests
-                    // std::string encoded_html = base64_encode(html);
+                    
+                    // Escape HTML content for JSON
+                    std::string escaped_html = html;
+                    // Replace backslashes first to avoid double escaping
+                    size_t pos = 0;
+                    while ((pos = escaped_html.find("\\", pos)) != std::string::npos) {
+                        escaped_html.replace(pos, 1, "\\\\");
+                        pos += 2;
+                    }
+                    // Replace quotes
+                    pos = 0;
+                    while ((pos = escaped_html.find("\"", pos)) != std::string::npos) {
+                        escaped_html.replace(pos, 1, "\\\"");
+                        pos += 2;
+                    }
+                    // Replace newlines
+                    pos = 0;
+                    while ((pos = escaped_html.find("\n", pos)) != std::string::npos) {
+                        escaped_html.replace(pos, 1, "\\n");
+                        pos += 2;
+                    }
+                    // Replace carriage returns
+                    pos = 0;
+                    while ((pos = escaped_html.find("\r", pos)) != std::string::npos) {
+                        escaped_html.replace(pos, 1, "\\r");
+                        pos += 2;
+                    }
+                    // Replace tabs
+                    pos = 0;
+                    while ((pos = escaped_html.find("\t", pos)) != std::string::npos) {
+                        escaped_html.replace(pos, 1, "\\t");
+                        pos += 2;
+                    }
                     
                     file << "  {\n"
                         << "    \"url\": \"" << url << "\",\n"
                         << "    \"timestamp\": \"" << get_timestamp_string() << "\",\n"
-                        << "    \"content_length\": " << html.length() << "\n"
+                        << "    \"content_length\": " << html.length() << ",\n"
+                        << "    \"content\": \"" << escaped_html << "\"\n"
                         << "  }";
                 }
                 file << "\n]";
@@ -1264,8 +1190,10 @@
         std::cout << "\n=== ERROR STATISTICS ===\n";
         for (const auto& [domain, stats] : domain_errors_) {
             std::cout << "Domain: " << domain << "\n";
-            for (const auto& [error, count] : stats.error_counts) {
-                std::cout << "  " << curl_easy_strerror(error) << ": " << count << "\n";
+            // Only show timeout errors and consecutive timeouts for brevity
+            auto timeout_it = stats.error_counts.find(CURLE_OPERATION_TIMEDOUT);
+            if (timeout_it != stats.error_counts.end()) {
+                std::cout << "  Timeout was reached: " << timeout_it->second << "\n";
             }
             std::cout << "  Consecutive timeouts: " << stats.consecutive_timeouts << "\n\n";
         }
@@ -1526,4 +1454,55 @@
 
     bool WorkStealingQueue::empty() const {
         return total_size() == 0;
+    }
+
+    std::string HtmlParser::extract_title(const std::string& html) {
+        std::smatch match;
+        if (std::regex_search(html, match, title_regex_) && match.size() > 1) {
+            std::string title = match[1].str();
+            // Clean up whitespace
+            title.erase(0, title.find_first_not_of(" \t\n\r"));
+            title.erase(title.find_last_not_of(" \t\n\r") + 1);
+            return title;
+        }
+        return "Untitled";
+    }
+
+    std::string HtmlParser::extract_text_content(const std::string& html) {
+        std::string text;
+        bool in_tag = false;
+        
+        for (char c : html) {
+            if (c == '<') {
+                in_tag = true;
+            } else if (c == '>') {
+                in_tag = false;
+            } else if (!in_tag) {
+                text += c;
+            }
+        }
+        
+        return text;
+    }
+
+    bool HtmlParser::is_html_content(const std::string& content) {
+        std::string lower_content = content.substr(0, 1000); // Check first 1KB
+        std::transform(lower_content.begin(), lower_content.end(), lower_content.begin(), ::tolower);
+        
+        return lower_content.find("<html") != std::string::npos ||
+            lower_content.find("<!doctype html") != std::string::npos ||
+            lower_content.find("<head") != std::string::npos ||
+            lower_content.find("<body") != std::string::npos;
+    }
+
+    std::string HtmlParser::extract_meta_description(const std::string& html) {
+        std::smatch match;
+        if (std::regex_search(html, match, meta_description_regex_) && match.size() > 1) {
+            std::string description = match[1].str();
+            // Clean up whitespace
+            description.erase(0, description.find_first_not_of(" \t\n\r"));
+            description.erase(description.find_last_not_of(" \t\n\r") + 1);
+            return description;
+        }
+        return "";
     }
