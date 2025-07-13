@@ -1,0 +1,461 @@
+Starting proxy test...
+🚀 HYBRID SPEED CRAWLER - Production-Ready Ultimate Performance
+================================================================
+Configuration - Phase 2 Enhanced:
+- Network workers: 8
+- HTML processors: 4
+- Max crawl depth: 3
+- Max queue size: 10000
+- Target performance: 300+ pages/sec
+- Phase 2 features: Sharded disk, Work stealing, HTML pipeline
+================================================================
+
+🔧 Initializing proxy system for 200-500+ pages/sec performance...
+📋 Added 3 free proxy endpoints (disabled by default)
+💡 To enable proxies, edit config/proxy_config.json and set enabled: true
+📋 Loaded proxy configuration with 3 endpoints
+🔧 Applying proxy configuration...
+⏸️  Skipped disabled proxy: free_us_1
+⏸️  Skipped disabled proxy: free_eu_1
+⏸️  Skipped disabled proxy: socks5_proxy_1
+📊 Proxy configuration applied: 0/3 proxies active
+✅ Proxy system initialized successfully
+- Total proxies: 0
+- Healthy proxies: 0
+- Domain sharding: ENABLED
+- Target performance: 50 req/sec per proxy
+⚠️  No healthy proxies available - using direct connections
+💡 To enable proxies:
+   1. Edit config/proxy_config.json
+   2. Add working proxy endpoints
+   3. Set enabled: true for proxy endpoints
+================================================================
+
+✅ Seeded hybrid crawler with 33/33 URLs
+📊 POST-SEED QUEUE STATUS:
+   Memory Queue: 33 URLs
+   Sharded Disk Queue: 257749 URLs
+   Work Stealing Queue: 0 URLs
+   HTML Processing Queue: 0 tasks
+🚀 Starting Phase 2 workers:
+   Network workers: 8
+   HTML processors: 4
+🔧 HTML processor 0 starting...
+🔧 HTML processor 1 starting...
+🏃 Worker 4 starting with MAX_CONCURRENT=30
+🔧 HTML processor 2 starting...
+🔄 Worker 4 skipping domain stackoverflow.com (consecutive limit)
+🏃 Worker 0 starting with MAX_CONCURRENT=30
+🏃 Worker 3 starting with MAX_CONCURRENT=30
+🔄 Worker 3 skipping domain en.wikipedia.org (consecutive limit)
+🔧 HTML processor 3 starting...
+🏃 Worker 7 starting with MAX_CONCURRENT=30
+🏃 Worker 6 starting with MAX_CONCURRENT=30
+🏃 Worker 5 starting with MAX_CONCURRENT=30
+🏃 Worker 1 starting with MAX_CONCURRENT=30
+🏃 Worker 2 starting with MAX_CONCURRENT=30
+🔄 Worker 6 skipping domain www.wikidata.org (consecutive limit)
+🔄 Worker 5 skipping domain arxiv.org (consecutive limit)
+🔧 HTML processor 2: 1 batches, 50 links (50.0 links/s)
+📊 POST-WORKER START STATUS (after 2s):
+   Memory Queue: 1840 URLs
+   Sharded Disk Queue: 253525 URLs
+   Work Stealing Queue: 1860 URLs
+   HTML Processing Queue: 0 tasks
+
+🚀 Phase 2 Enhanced Crawler started!
+   Network pipeline: 8 workers
+   HTML pipeline: 4 processors
+   Target: 300+ pages/sec with pipelined processing
+Press Ctrl+C to gracefully shutdown
+
+📊 Starting continuous queue & speed monitoring...
+🔍 STARTUP QUEUE STATUS:
+   Memory Queue: 1840 URLs
+   Sharded Disk Queue: 253525 URLs
+   Work Stealing Queue: 1860 URLs
+   HTML Processing Queue: 0 tasks
+   Total Available: 257225 URLs
+
+🔧 HTML processor 3: 1 batches, 50 links (25.0 links/s)
+🔧 HTML processor 0: 2 batches, 100 links (50.0 links/s)
+🔧 HTML processor 1: 2 batches, 100 links (50.0 links/s)
+🔧 HTML processor 2: 2 batches, 79 links (26.3 links/s)
+🔧 HTML processor 3: 2 batches, 100 links (33.3 links/s)
+🔧 HTML processor 0: 3 batches, 100 links (33.3 links/s)
+🔄 Worker 3 skipping domain als.wikipedia.org (consecutive limit)
+🔧 HTML processor 2: 3 batches, 129 links (43.0 links/s)
+🔄 Worker 0 skipping domain als.wikipedia.org (consecutive limit)
+🔧 HTML processor 3: 3 batches, 150 links (50.0 links/s)
+🔧 HTML processor 1: 3 batches, 150 links (50.0 links/s)
+🔧 HTML processor 0: 4 batches, 150 links (50.0 links/s)
+🔧 HTML processor 2: 4 batches, 179 links (59.7 links/s)
+🔧 HTML processor 3: 4 batches, 200 links (66.7 links/s)
+🔧 HTML processor 1: 4 batches, 200 links (66.7 links/s)
+🔄 Worker 4 skipping domain cals.cornell.edu (consecutive limit)
+🔄 MONITORING STATUS: Time=5s | Queue=✅2914 | DiskQueue=254009 | WorkStealing=5012 | HTMLQueue=0 | Rate=16.3 pages/sec | TotalProcessed=114 | Proxies=0/0
+🔄 Worker 2 skipping domain news.cornell.edu (consecutive limit)
+🔄 Worker 2 skipping domain news.cornell.edu (consecutive limit)
+🔍 Worker 7 diagnostics: Queue=4131 | Dequeued=153 | Active=30 | Processed=9 | Skipped: BL=0 R=0 RL=102
+🔍 Worker 0 diagnostics: Queue=4131 | Dequeued=167 | Active=27 | Processed=81 | Skipped: BL=0 R=0 RL=63
+🔍 Worker 4 diagnostics: Queue=4264 | Dequeued=165 | Active=27 | Processed=57 | Skipped: BL=0 R=0 RL=72
+🔍 Worker 3 diagnostics: Queue=4287 | Dequeued=184 | Active=28 | Processed=94 | Skipped: BL=0 R=0 RL=59
+🔍 Worker 6 diagnostics: Queue=4314 | Dequeued=76 | Active=25 | Processed=10 | Skipped: BL=0 R=0 RL=24
+🔄 Worker 6 skipping domain news.cornell.edu (consecutive limit)
+🔄 Worker 7 skipping domain an.wikipedia.org (consecutive limit)
+🔍 Worker 1 diagnostics: Queue=4343 | Dequeued=106 | Active=29 | Processed=7 | Skipped: BL=2 R=0 RL=54
+🔄 MONITORING STATUS: Time=10s | Queue=✅4429 | DiskQueue=260279 | WorkStealing=5012 | HTMLQueue=0 | Rate=26.0 pages/sec | TotalProcessed=312 | Proxies=0/0
+🔄 Worker 4 skipping domain ban.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 7 skipping domain cals.cornell.edu (consecutive limit)
+🔍 Worker 5 diagnostics: Queue=5076 | Dequeued=76 | Active=3 | Processed=7 | Skipped: BL=0 R=0 RL=43
+🔄 Worker 5 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 5 skipping domain cals.cornell.edu (consecutive limit)
+🔍 Worker 2 diagnostics: Queue=4969 | Dequeued=120 | Active=11 | Processed=3 | Skipped: BL=0 R=0 RL=71
+🔄 MONITORING STATUS: Time=15s | Queue=✅5001 | DiskQueue=266006 | WorkStealing=5012 | HTMLQueue=0 | Rate=29.7 pages/sec | TotalProcessed=505 | Proxies=0/0
+🔍 Worker 7 diagnostics: Queue=4788 | Dequeued=272 | Active=21 | Processed=64 | Skipped: BL=10 R=0 RL=165
+🔄 Worker 7 skipping domain meta.wikimedia.org (consecutive limit)
+🔍 Worker 4 diagnostics: Queue=4775 | Dequeued=384 | Active=22 | Processed=140 | Skipped: BL=20 R=0 RL=200
+🔍 Worker 0 diagnostics: Queue=4781 | Dequeued=401 | Active=25 | Processed=182 | Skipped: BL=21 R=0 RL=203
+🔍 Worker 1 diagnostics: Queue=4736 | Dequeued=245 | Active=26 | Processed=32 | Skipped: BL=15 R=0 RL=126
+🔄 MONITORING STATUS: Time=20s | Queue=✅4656 | DiskQueue=272724 | WorkStealing=5012 | HTMLQueue=2 | Rate=32.4 pages/sec | TotalProcessed=713 | Proxies=0/0
+🔍 Worker 6 diagnostics: Queue=4653 | Dequeued=291 | Active=28 | Processed=59 | Skipped: BL=15 R=0 RL=164
+🔍 Worker 3 diagnostics: Queue=4582 | Dequeued=364 | Active=8 | Processed=177 | Skipped: BL=19 R=0 RL=140
+🔄 Worker 6 skipping domain lb.wikipedia.org (consecutive limit)
+🔄 MONITORING STATUS: Time=25s | Queue=✅3219 | DiskQueue=277465 | WorkStealing=5012 | HTMLQueue=0 | Rate=31.0 pages/sec | TotalProcessed=838 | Proxies=0/0
+🔄 Worker 4 skipping domain als.wikipedia.org (consecutive limit)
+🔍 Worker 2 diagnostics: Queue=2982 | Dequeued=509 | Active=28 | Processed=14 | Skipped: BL=23 R=0 RL=386
+🔍 Worker 5 diagnostics: Queue=2980 | Dequeued=465 | Active=22 | Processed=15 | Skipped: BL=17 R=0 RL=342
+🔄 Worker 0 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 7 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 7 skipping domain arxiv.org (consecutive limit)
+🔄 Worker 2 skipping domain az.wiktionary.org (consecutive limit)
+🔍 Worker 4 diagnostics: Queue=1461 | Dequeued=930 | Active=24 | Processed=224 | Skipped: BL=112 R=0 RL=576
+🔍 Worker 7 diagnostics: Queue=1399 | Dequeued=984 | Active=25 | Processed=117 | Skipped: BL=169 R=0 RL=656
+🔄 MONITORING STATUS: Time=30s | Queue=✅1365 | DiskQueue=282752 | WorkStealing=5012 | HTMLQueue=0 | Rate=30.9 pages/sec | TotalProcessed=990 | Proxies=0/0
+🔍 Worker 6 diagnostics: Queue=1316 | Dequeued=782 | Active=27 | Processed=92 | Skipped: BL=146 R=0 RL=481
+🔍 Worker 1 diagnostics: Queue=1310 | Dequeued=824 | Active=8 | Processed=65 | Skipped: BL=79 R=0 RL=588
+🔄 Worker 1 skipping domain info.arxiv.org (consecutive limit)
+Worker 6 blacklisted domain: admissions.cornell.edu
+Worker 6 blacklisted domain: admissions.cornell.edu
+Worker 6 blacklisted domain: admissions.cornell.edu
+🔄 Worker 6 skipping domain simple.wiktionary.org (consecutive limit)
+🔄 Worker 6 skipping domain provost.cornell.edu (consecutive limit)
+🔄 Worker 4 skipping domain de.wikivoyage.org (consecutive limit)
+🔍 Worker 0 diagnostics: Queue=990 | Dequeued=823 | Active=20 | Processed=230 | Skipped: BL=109 R=0 RL=477
+🔄 Worker 0 skipping domain nn.wiktionary.org (consecutive limit)
+Worker 7 blacklisted domain: admissions.cornell.edu
+🔄 Worker 7 skipping domain gn.wikipedia.org (consecutive limit)
+🔄 Worker 7 skipping domain bm.wikipedia.org (consecutive limit)
+Worker 0 blacklisted domain: zu.wikipedia.org
+🔍 Worker 3 diagnostics: Queue=1015 | Dequeued=869 | Active=25 | Processed=210 | Skipped: BL=106 R=0 RL=491
+Worker 2 blacklisted domain: ckb.wikipedia.org
+🔄 Worker 5 skipping domain global.cornell.edu (consecutive limit)
+🔄 Worker 2 skipping domain de.wikinews.org (consecutive limit)
+🔄 MONITORING STATUS: Time=35s | Queue=✅1569 | DiskQueue=286746 | WorkStealing=5012 | HTMLQueue=0 | Rate=31.1 pages/sec | TotalProcessed=1151 | Proxies=0/0
+🔄 Worker 0 skipping domain news.cornell.edu (consecutive limit)
+🔄 Worker 7 skipping domain en.wikinews.org (consecutive limit)
+🔄 Worker 3 skipping domain military.cornell.edu (consecutive limit)
+🔍 Worker 5 diagnostics: Queue=1740 | Dequeued=816 | Active=26 | Processed=49 | Skipped: BL=89 R=0 RL=561
+🔄 Worker 5 skipping domain military.cornell.edu (consecutive limit)
+🔍 Worker 2 diagnostics: Queue=1780 | Dequeued=764 | Active=27 | Processed=74 | Skipped: BL=80 R=0 RL=538
+🔄 Worker 6 skipping domain ca.wikisource.org (consecutive limit)
+🔄 Worker 1 skipping domain www.human.cornell.edu (consecutive limit)
+🔍 Worker 7 diagnostics: Queue=2010 | Dequeued=1155 | Active=17 | Processed=172 | Skipped: BL=185 R=0 RL=759
+🔄 MONITORING STATUS: Time=40s | Queue=✅2032 | DiskQueue=291334 | WorkStealing=5012 | HTMLQueue=0 | Rate=31.2 pages/sec | TotalProcessed=1309 | Proxies=0/0
+🔍 Worker 4 diagnostics: Queue=2070 | Dequeued=1119 | Active=20 | Processed=277 | Skipped: BL=127 R=0 RL=693
+🔄 Worker 4 skipping domain ccss.dnr.cals.cornell.edu (consecutive limit)
+🔄 Worker 3 skipping domain ccss.dnr.cals.cornell.edu (consecutive limit)
+🔄 Worker 4 skipping domain www.vet.cornell.edu (consecutive limit)
+🔍 Worker 0 diagnostics: Queue=2197 | Dequeued=1020 | Active=29 | Processed=263 | Skipped: BL=118 R=0 RL=616
+🔄 Worker 2 skipping domain mediarelations.cornell.edu (consecutive limit)
+🔍 Worker 6 diagnostics: Queue=2164 | Dequeued=1098 | Active=20 | Processed=112 | Skipped: BL=190 R=0 RL=686
+🔍 Worker 1 diagnostics: Queue=2186 | Dequeued=1190 | Active=20 | Processed=105 | Skipped: BL=192 R=0 RL=781
+🔍 Worker 3 diagnostics: Queue=2187 | Dequeued=1030 | Active=25 | Processed=258 | Skipped: BL=108 R=0 RL=612
+🔄 MONITORING STATUS: Time=45s | Queue=✅2253 | DiskQueue=295694 | WorkStealing=5012 | HTMLQueue=2 | Rate=30.9 pages/sec | TotalProcessed=1452 | Proxies=0/0
+Worker 5 blacklisted domain: it.wikinews.org
+🔍 Worker 5 diagnostics: Queue=2188 | Dequeued=890 | Active=13 | Processed=77 | Skipped: BL=91 R=0 RL=601
+Worker 1 blacklisted domain: pediapress.com
+🔍 Worker 2 diagnostics: Queue=1814 | Dequeued=1024 | Active=24 | Processed=125 | Skipped: BL=85 R=0 RL=728
+Worker 0 blacklisted domain: pediapress.com
+Worker 7 blacklisted domain: eo.wikinews.org
+🔄 MONITORING STATUS: Time=50s | Queue=✅1190 | DiskQueue=300596 | WorkStealing=5012 | HTMLQueue=0 | Rate=30.6 pages/sec | TotalProcessed=1591 | Proxies=0/0
+🔄 Worker 4 skipping domain ha.wiktionary.org (consecutive limit)
+Worker 1 blacklisted domain: bs.wikinews.org
+🔍 Worker 4 diagnostics: Queue=785 | Dequeued=1544 | Active=27 | Processed=342 | Skipped: BL=157 R=0 RL=1031
+🔄 Worker 4 skipping domain ca.wikiquote.org (consecutive limit)
+Worker 6 blacklisted domain: pediapress.com
+Worker 5 blacklisted domain: pediapress.com
+Worker 5 blacklisted domain: bs.wikinews.org
+🔄 Worker 5 skipping domain ca.wikiquote.org (consecutive limit)
+Worker 1 blacklisted domain: pediapress.com
+🔍 Worker 7 diagnostics: Queue=271 | Dequeued=1564 | Active=28 | Processed=193 | Skipped: BL=247 R=0 RL=1053
+Worker 2 blacklisted domain: tr.wikinews.org
+🔄 Worker 2 skipping domain he.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain patchstack.com (consecutive limit)
+🔄 Worker 2 skipping domain glk.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain www.wikidata.org (consecutive limit)
+🔄 Worker 2 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 2 skipping domain ban.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain info.arxiv.org (consecutive limit)
+🔍 Worker 0 diagnostics: Queue=0 | Dequeued=1314 | Active=21 | Processed=289 | Skipped: BL=155 R=0 RL=834
+🔄 Worker 0 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 0 skipping domain www.freethink.com (consecutive limit)
+🔄 Worker 3 skipping domain www.freethink.com (consecutive limit)
+🔄 Worker 3 skipping domain it.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain en.wiktionary.org (consecutive limit)
+🔄 Worker 3 skipping domain en.wiktionary.org (consecutive limit)
+🔄 Worker 2 skipping domain br.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain ko.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain glk.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 2 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 2 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 2 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 2 skipping domain bn.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain bn.wikipedia.org (consecutive limit)
+🚫 DOMAIN RETIRED: pediapress.com (failures: 10)
+Worker 0 blacklisted domain: pediapress.com
+Worker 0 blacklisted domain: cs.wikinews.org
+🔄 Worker 0 skipping domain bar.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain bar.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain ca.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain ca.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain ca.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 0 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 0 skipping domain glk.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 0 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 0 skipping domain da.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 0 skipping domain kk.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain kk.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 0 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 0 skipping domain phabricator.wikimedia.org (consecutive limit)
+🔄 Worker 0 skipping domain es.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain hy.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain cs.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain my.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain my.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain dtp.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain pl.wiktionary.org (consecutive limit)
+🔄 Worker 0 skipping domain anp.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain als.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain als.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain patchstack.com (consecutive limit)
+🔄 Worker 2 skipping domain eu.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain eu.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain eu.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain bh.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain avk.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain wikimediafoundation.org (consecutive limit)
+🔍 Worker 1 diagnostics: Queue=0 | Dequeued=1944 | Active=28 | Processed=146 | Skipped: BL=274 R=0 RL=1395
+🔍 Worker 6 diagnostics: Queue=0 | Dequeued=1370 | Active=22 | Processed=157 | Skipped: BL=218 R=0 RL=892
+🔄 Worker 6 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 7 skipping domain simple.wiktionary.org (consecutive limit)
+🔄 Worker 7 skipping domain simple.wiktionary.org (consecutive limit)
+🔄 Worker 7 skipping domain simple.wiktionary.org (consecutive limit)
+🔄 Worker 7 skipping domain www.wikidata.org (consecutive limit)
+🔄 Worker 7 skipping domain he.wikipedia.org (consecutive limit)
+🔄 Worker 7 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 7 skipping domain it.wikipedia.org (consecutive limit)
+🔄 Worker 7 skipping domain en.wiktionary.org (consecutive limit)
+🔄 Worker 7 skipping domain ja.wikipedia.org (consecutive limit)
+🔄 Worker 4 skipping domain it.wikipedia.org (consecutive limit)
+🔄 Worker 6 skipping domain foundation.wikimedia.org (consecutive limit)
+🔄 Worker 6 skipping domain kk.wikipedia.org (consecutive limit)
+🔄 Worker 6 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 6 skipping domain be-tarask.wikipedia.org (consecutive limit)
+🔄 Worker 6 skipping domain br.wikipedia.org (consecutive limit)
+🔄 Worker 4 skipping domain www.wikidata.org (consecutive limit)
+🔄 Worker 4 skipping domain bn.wikipedia.org (consecutive limit)
+🔄 Worker 4 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 4 skipping domain www.freethink.com (consecutive limit)
+🔄 Worker 4 skipping domain commons.wikimedia.org (consecutive limit)
+🔄 Worker 4 skipping domain en.wiktionary.org (consecutive limit)
+Worker 3 blacklisted domain: pediapress.com
+🔍 Worker 3 diagnostics: Queue=20 | Dequeued=1409 | Active=23 | Processed=298 | Skipped: BL=170 R=0 RL=882
+🔄 Worker 5 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 5 skipping domain www.freethink.com (consecutive limit)
+🔄 Worker 5 skipping domain id.wikipedia.org (consecutive limit)
+🔄 Worker 5 skipping domain hi.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain foundation.wikimedia.org (consecutive limit)
+🔄 Worker 2 skipping domain foundation.wikimedia.org (consecutive limit)
+🔄 Worker 2 skipping domain nl.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain ang.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain az.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain hy.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain hy.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain anp.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain be-tarask.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain www.wikidata.org (consecutive limit)
+🔄 Worker 1 skipping domain kk.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain br.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wiktionary.org (consecutive limit)
+🔄 Worker 1 skipping domain de.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 1 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 1 skipping domain www.wikifunctions.org (consecutive limit)
+🔄 Worker 1 skipping domain arxiv.org (consecutive limit)
+Worker 3 blacklisted domain: bg.wiktionary.org
+Worker 3 blacklisted domain: simple.wiktionary.org
+🔄 Worker 3 skipping domain am.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain eu.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 3 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 3 skipping domain info.arxiv.org (consecutive limit)
+🔄 MONITORING STATUS: Time=55s | Queue=⚠️ 0 | DiskQueue=303611 | WorkStealing=3203 | HTMLQueue=0 | Rate=30.2 pages/sec | TotalProcessed=1724 | Proxies=0/0
+🚨 Emergency injection #1: Added 12/33 emergency seeds
+🔄 Worker 1 skipping domain pa.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain ja.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain info.arxiv.org (consecutive limit)
+🔄 Worker 1 skipping domain lb.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain my.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain blk.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain el.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain en.wiktionary.org (consecutive limit)
+🔄 Worker 3 skipping domain en.wiktionary.org (consecutive limit)
+🔄 Worker 3 skipping domain anp.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain ckb.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain als.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain als.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain gl.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain gl.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain ko.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain ko.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain fo.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain en.wiktionary.org (consecutive limit)
+Worker 5 blacklisted domain: ha.wiktionary.org
+🔄 Worker 5 skipping domain he.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain bh.wikipedia.org (consecutive limit)
+🔄 Worker 7 skipping domain ami.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wikiquote.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wikiquote.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wikiquote.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wikiquote.org (consecutive limit)
+🔄 Worker 1 skipping domain ja.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain bar.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain bar.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain foundation.wikimedia.org (consecutive limit)
+🔄 Worker 1 skipping domain ko.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain ko.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain ca.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain ca.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain als.wikipedia.org (consecutive limit)
+Worker 6 blacklisted domain: pediapress.com
+Worker 0 blacklisted domain: pediapress.com
+Worker 0 blacklisted domain: pediapress.com
+🔄 Worker 0 skipping domain cy.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain de.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain de.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 7 skipping domain ca.wikiquote.org (consecutive limit)
+🔄 Worker 0 skipping domain ca.wikiquote.org (consecutive limit)
+🔄 Worker 0 skipping domain eu.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain eu.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 0 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 0 skipping domain cu.wikipedia.org (consecutive limit)
+🔄 Worker 0 skipping domain cs.wikibooks.org (consecutive limit)
+🔄 Worker 0 skipping domain cs.wikibooks.org (consecutive limit)
+🔄 Worker 1 skipping domain als.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain bat-smg.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain lb.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain ms.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wiktionary.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 1 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 1 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 1 skipping domain cals.cornell.edu (consecutive limit)
+🔄 Worker 1 skipping domain cals.cornell.edu (consecutive limit)
+Worker 5 blacklisted domain: io.wiktionary.org
+🔍 Worker 5 diagnostics: Queue=2 | Dequeued=1524 | Active=23 | Processed=95 | Skipped: BL=166 R=0 RL=1108
+🔄 Worker 5 skipping domain kk.wikipedia.org (consecutive limit)
+🔄 Worker 5 skipping domain br.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain ast.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain alt.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain en.wikipedia.org (consecutive limit)
+🔄 Worker 2 skipping domain ca.wikiquote.org (consecutive limit)
+🔄 Worker 2 skipping domain www.wikidata.org (consecutive limit)
+🔄 Worker 2 skipping domain fa.wikinews.org (consecutive limit)
+🔄 Worker 2 skipping domain fa.wikinews.org (consecutive limit)
+🔄 Worker 4 skipping domain bdr.wikipedia.org (consecutive limit)
+🔄 Worker 7 skipping domain mwl.wikipedia.org (consecutive limit)
+🔄 Worker 6 skipping domain mwl.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain sustainability.cornell.edu (consecutive limit)
+🔄 Worker 3 skipping domain sustainability.cornell.edu (consecutive limit)
+🔄 Worker 3 skipping domain ami.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain sustainability.cornell.edu (consecutive limit)
+🔄 Worker 3 skipping domain da.wikipedia.org (consecutive limit)
+🔄 Worker 3 skipping domain da.wikipedia.org (consecutive limit)
+🔍 Worker 2 diagnostics: Queue=24 | Dequeued=2229 | Active=24 | Processed=176 | Skipped: BL=323 R=0 RL=1410
+
+Received shutdown signal. Gracefully shutting down hybrid crawler...
+🔧 HTML processor 3 finished. Processed 473 batches, 20312 total links.
+🔧 HTML processor 2 finished. Processed 434 batches, 18484 total links.
+🔧 HTML processor 0 finished. Processed 478 batches, 20551 total links.
+🔧 HTML processor 1 finished. Processed 464 batches, 19903 total links.
+Multi-worker 5 finished. Processed 102 pages.
+Multi-worker 1 finished. Processed 161 pages.
+Multi-worker 4 finished. Processed 376 pages.
+Multi-worker 7 finished. Processed 239 pages.
+Multi-worker 2 finished. Processed 179 pages.
+Multi-worker 3 finished. Processed 304 pages.
+Multi-worker 6 finished. Processed 202 pages.
+Multi-worker 0 finished. Processed 316 pages.
+🔄 MONITORING STATUS: Time=60s | Queue=⚡15 | DiskQueue=304299 | WorkStealing=3993 | HTMLQueue=30 | Rate=30.3 pages/sec | TotalProcessed=1879 | Proxies=0/0
+🚨 Emergency injection #2: Added 0/33 emergency seeds
+
+🎯 FINAL PHASE 2 CRAWLER RESULTS
+===================================
+
+================== CRAWLER STATISTICS ==================
+Runtime: 62 seconds
+Crawl rate: 30.31 pages/sec
+Discovery rate: 274.73 links/sec
+Download rate: 1.12 MB/sec
+Total pages: 1879
+Total links: 17033
+Network errors: 1167
+Queue size: 15
+Active threads: 0
+========================================================
+
+
+🚀 ULTRA PARSER PERFORMANCE STATS 🚀
+=====================================
+Pages processed: 1760
+Average time per page: 23.37 ms
+Theoretical max speed: 43 pages/sec
+SIMD filtered pages: 89 (5%)
+Total links extracted: 122663
+Avg links per page: 69
+=====================================
+
+
+🚫 URL FILTERING STATS 🚫
+==========================
+Total URLs blocked: 15003
+  By extension: 774
+  By path pattern: 984
+  By spam detection: 48
+  By fragment (#): 9289
+  By query params: 3908
+==========================
+
+📊 PHASE 2 QUEUE FINAL STATS:
+   Memory Queue: 15 URLs remaining
+   Sharded Disk Queue: 304299 URLs remaining
+   Work Stealing Queue: 3993 URLs remaining
+   HTML Processing Queue: 30 tasks remaining
+📊 Performance: 30.3 pages/sec
+🏁 Phase 2 Enhanced Crawler shutdown complete.
+ProxyPool: Health monitoring stop requested (not implemented yet)
