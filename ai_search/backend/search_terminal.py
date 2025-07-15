@@ -24,8 +24,7 @@ def get_db_connection(db_path):
 
 def search_documents(query, limit=10):
     """Search through documents using keyword matching"""
-    project_root = Path(__file__).parent.parent.parent
-    db_path = project_root / "data" / "processed" / "documents.db"
+    db_path = Path(__file__).parent / "data" / "processed" / "documents.db"
     
     conn = get_db_connection(db_path)
     if not conn:
@@ -89,8 +88,7 @@ def display_results(results, search_time, query):
 
 def get_database_stats():
     """Get quick database statistics"""
-    project_root = Path(__file__).parent.parent.parent
-    db_path = project_root / "data" / "processed" / "documents.db"
+    db_path = Path(__file__).parent / "data" / "processed" / "documents.db"
     
     conn = get_db_connection(db_path)
     if not conn:

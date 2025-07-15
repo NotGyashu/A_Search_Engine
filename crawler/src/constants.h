@@ -13,10 +13,10 @@ namespace CrawlerConstants {
 
 // =============== WORKER CONFIGURATION ===============
 namespace Workers {
-    constexpr int DEFAULT_MAX_THREADS = 4;              // Default network workers
+    constexpr int DEFAULT_MAX_THREADS = 6;              // Default network workers
     constexpr int MIN_THREADS = 1;                      // Minimum worker threads
     constexpr int MAX_THREADS = 32;                     // Maximum worker threads
-    constexpr int HTML_WORKER_RATIO = 2;                // Network workers / HTML workers
+    constexpr int HTML_WORKER_RATIO = 3;                // Network workers / HTML workers
     constexpr int MIN_HTML_WORKERS = 1;                 // Minimum HTML processors
 }
 
@@ -24,14 +24,14 @@ namespace Workers {
 namespace Queue {
     constexpr int DEFAULT_MAX_DEPTH = 4;                // Default crawl depth
     constexpr int DEFAULT_MAX_QUEUE_SIZE = 500000;      // Default main queue size
-    constexpr int MAX_CONCURRENT_REQUESTS = 50;         // Max concurrent requests per worker
+    constexpr int MAX_CONCURRENT_REQUESTS = 30;         // Max concurrent requests per worker
     constexpr int MAX_QUEUE_DRAIN_ATTEMPTS = 100;       // Max attempts to drain queue
-    constexpr int DISK_LOAD_BATCH_SIZE = 200;           // URLs loaded from disk per batch
+    constexpr int DISK_LOAD_BATCH_SIZE = 1000;           // URLs loaded from disk per batch
     constexpr int REFILL_THRESHOLD = 1000;               // Refill main queue when below this
     constexpr int LOW_QUEUE_THRESHOLD = 100;            // Trigger emergency seeds
     constexpr int CRITICAL_QUEUE_THRESHOLD = 10;        // Auto-shutdown threshold
     constexpr int DOMAIN_QUEUE_LIMIT = 100;             // Per-domain queue size limit
-    constexpr int SHARDED_DISK_LOAD_SIZE = 100;          // Sharded disk load batch size
+    constexpr int SHARDED_DISK_LOAD_SIZE = 1000;          // Sharded disk load batch size
 }
 
 // =============== LINK EXTRACTION ===============
@@ -108,7 +108,7 @@ namespace Storage {
 // =============== RATE LIMITING ===============
 namespace RateLimit {
     constexpr int MIN_CRAWL_DELAY_MS = 10;              // Very fast crawling default
-    constexpr int DEFAULT_CRAWL_DELAY_MS = 200;         // Default crawl delay
+    constexpr int DEFAULT_CRAWL_DELAY_MS = 50;         // Default crawl delay
     constexpr int MIN_ROBOTS_DELAY_MS = 200;            // Minimum robots.txt delay
     constexpr int BASE_BACKOFF_MS = 2;                  // Base backoff delay
     constexpr int MAX_BACKOFF_MS = 20;                  // Maximum backoff delay
@@ -153,7 +153,7 @@ namespace Headers {
 namespace Paths {
     constexpr const char* DB_PATH = "../data/processed/hybrid_crawl_metadata.db";
     constexpr const char* LOG_PATH = "../data/processed/hybrid_crawl_log.csv";
-    constexpr const char* RAW_DATA_PATH = "../data/raw";
+    constexpr const char* RAW_DATA_PATH = "../../Data/Raw";
     constexpr const char* BLACKLIST_PATH = "../config/blacklist.txt";
     constexpr const char* SHARDED_DISK_PATH = "../data";
 }

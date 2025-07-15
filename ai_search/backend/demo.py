@@ -43,9 +43,8 @@ def get_db_connection(db_path, timeout=30.0, max_retries=3):
 
 def show_stats():
     """Show impressive statistics about your search engine"""
-    # Get the project root directory (two levels up from this script)
-    project_root = Path(__file__).parent.parent.parent
-    db_path = project_root / "data" / "processed" / "documents.db"
+    # Get the database path from the correct location
+    db_path = Path(__file__).parent / "data" / "processed" / "documents.db"
     
     conn = None
     try:
@@ -107,7 +106,7 @@ def demo_search():
     
     # Get the project root directory (two levels up from this script)
     project_root = Path(__file__).parent.parent.parent
-    db_path = project_root / "data" / "processed" / "documents.db"
+    db_path = Path(__file__).parent / "data" / "processed" / "documents.db"
     
     conn = None
     try:

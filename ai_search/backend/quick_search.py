@@ -14,7 +14,7 @@ from pathlib import Path
 def search_documents(query, limit=10):
     """Search through documents"""
     project_root = Path(__file__).parent.parent.parent
-    db_path = project_root / "data" / "processed" / "documents.db"
+    db_path = Path(__file__).parent / "data" / "processed" / "documents.db"
     
     try:
         conn = sqlite3.connect(str(db_path), timeout=10.0)

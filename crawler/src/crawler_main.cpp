@@ -94,7 +94,7 @@ public:
     }
     
     // Load URLs from disk to refill memory queue
-    std::vector<std::string> load_urls_from_disk(size_t max_count = 200) {
+    std::vector<std::string> load_urls_from_disk(size_t max_count = 5000) {
         std::lock_guard<std::mutex> lock(disk_mutex_);
         std::vector<std::string> loaded_urls;
         
@@ -553,10 +553,11 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                                 batch_buffer.emplace_back(ctx->url, ctx->response_data);
                                 
                                 // Save batch when it reaches optimal size
-                                if (batch_buffer.size() >= CrawlerConstants::Storage::BATCH_SIZE)
+                                if (batch_buffer.size() >= CrawlerConstants::Storage::BATCH_SIZE) {
                                     file_storage->save_html_batch(batch_buffer);
-                                    batch_buffer.clear();
-                                
+                                    batch_buffer.clear();  // ✅ Only clear after saving
+                                }
+                                                                
                                 // PHASE 2: Pipeline HTML processing instead of blocking here
                                 if (ctx->url_info.depth < 5 && HtmlParser::is_html_content(ctx->response_data)) {
                                     // Queue HTML for asynchronous processing
@@ -999,50 +1000,127 @@ int main(int argc, char* argv[]) {
     
     // High-quality seed URLs optimized for speed and variety - EXPANDED
     const std::vector<std::string> seed_urls = {
-        // Fast, reliable test endpoints
-        "https://httpbin.org/html",
-        "https://httpbin.org/links/20",
-        "https://httpbin.org/links/50",
-        "https://httpbin.org/range/100",
-        "https://jsonplaceholder.typicode.com/",
-        
-        // High-quality content sources (Wikipedia)
-        "https://en.wikipedia.org/wiki/Main_Page",
-        "https://en.wikipedia.org/wiki/Artificial_intelligence",
-        "https://en.wikipedia.org/wiki/Machine_learning",
-        "https://en.wikipedia.org/wiki/Computer_science",
-        "https://en.wikipedia.org/wiki/Web_crawler",
-        "https://en.wikipedia.org/wiki/Python_(programming_language)",
-        "https://en.wikipedia.org/wiki/JavaScript",
+        // Art & Culture
+        "https://www.metmuseum.org/art/collection",
+        "https://www.tate.org.uk/art/artists",
+        "https://artsandculture.google.com/category/artist",
+        "https://www.nga.gov/collection/artists.html",
+        "https://www.britishmuseum.org/collection",
+
+        // History
+        "https://www.history.com/topics",
+        "https://www.archives.gov/research/catalog",
+        "https://www.britannica.com/list/browse/history",
+        "https://www.worldhistory.org/timeline/",
+        "https://www.si.edu/collections/history-culture",
+
+        // Science & Nature
+        "https://www.nature.com/subjects",
+        "https://www.science.org/toc/science/current",
+        "https://www.nasa.gov/topics/earth/index.html",
+        "https://www.nhm.ac.uk/discover.html",
+        "https://ocean.si.edu/ocean-life",
+
+        // Literature & Philosophy
+        "https://www.poetryfoundation.org/poets",
+        "https://plato.stanford.edu/contents.html",
+        "https://www.gutenberg.org/browse/scores/top",
+        "https://www.literaryhub.com/category/features",
+        "https://iep.utm.edu/browse/",
+
+        // Geography & Travel
+        "https://www.nationalgeographic.com/maps",
+        "https://whc.unesco.org/en/list/",
+        "https://www.lonelyplanet.com/articles",
+        "https://www.cia.gov/the-world-factbook/",
+        "https://www.worldtravelguide.net/features/",
+
+        // Technology & Engineering
+        "https://spectrum.ieee.org/topic/artificial-intelligence/",
+        "https://www.technologyreview.com/category/ai/",
+        "https://www.digitaltrends.com/computing/",
+        "https://www.engineering.com/",
+        "https://www.sciencedaily.com/news/computers_math/computer_science/",
+
+        // Health & Medicine
+        "https://www.who.int/news-room/feature-stories",
+        "https://www.mayoclinic.org/diseases-conditions/index",
+        "https://www.nih.gov/health-information",
+        "https://www.healthline.com/nutrition",
+        "https://www.cdc.gov/ncezid/",
+
+        // Economics & Business
+        "https://www.economist.com/latest-updates",
+        "https://www.bloomberg.com/markets",
+        "https://www.mckinsey.com/featured-insights",
+        "https://www.forbes.com/innovation/",
+        "https://www.worldbank.org/en/topic",
+
+        // Education & Reference
+        "https://www.khanacademy.org/library",
+        "https://ocw.mit.edu/courses/",
+        "https://www.coursera.org/courses",
+        "https://www.refdesk.com/facts.html",
+        "https://www.merriam-webster.com/word-of-the-day",
+
+        // Miscellaneous Knowledge
+        "https://www.bonappetit.com/recipes",          // Food
+        "https://www.espn.com/olympics/sports/",       // Sports
+        "https://www.apa.org/topics",                  // Psychology
+        "https://www.ipcc.ch/reports/",                // Environment
+        "https://www.ethnologue.com/browse/languages", // Linguistics
+
+        // High‑Density Aggregators
+        "https://www.reddit.com/r/todayilearned/top/",
+        "https://www.bbc.co.uk/sounds/categories",
+        "https://www.curlie.org/",
+        "https://www.wikihow.com/Main-Page",
+        "https://www.brainpickings.org/archive/",
+
+        // Wikipedia (high link density)
+        "https://en.wikipedia.org/wiki/Special:Random",
+        "https://en.wikipedia.org/wiki/List_of_programming_languages",
+        "https://en.wikipedia.org/wiki/Computer_programming",
         "https://en.wikipedia.org/wiki/Software_engineering",
         "https://en.wikipedia.org/wiki/Data_science",
-        "https://en.wikipedia.org/wiki/Internet",
-        "https://en.wikipedia.org/wiki/World_Wide_Web",
-        
-        // Technical documentation (fast-loading)
+        "https://en.wikipedia.org/wiki/Machine_learning",
+        "https://en.wikipedia.org/wiki/Artificial_intelligence",
+        "https://en.wikipedia.org/wiki/Web_development",
+        "https://en.wikipedia.org/wiki/Database",
+        "https://en.wikipedia.org/wiki/Computer_science",
+
+        // StackOverflow (technical content)
+        "https://stackoverflow.com/questions",
         "https://stackoverflow.com/questions/tagged/python",
-        "https://stackoverflow.com/questions/tagged/machine-learning",
-        "https://stackoverflow.com/questions/tagged/web-scraping",
         "https://stackoverflow.com/questions/tagged/javascript",
-        "https://stackoverflow.com/questions/tagged/html",
+        "https://stackoverflow.com/questions/tagged/web-scraping",
+        "https://stackoverflow.com/questions/tagged/machine-learning",
+        "https://stackoverflow.com/questions/tagged/database",
+
+        // GitHub (developer content)
+        "https://github.com/trending",
         "https://github.com/trending/python",
         "https://github.com/trending/javascript",
         "https://github.com/topics/machine-learning",
         "https://github.com/topics/artificial-intelligence",
-        
-        // News sources (good link density)
+        "https://github.com/topics/web-development",
+
+        // News & Tech
         "https://news.ycombinator.com",
         "https://news.ycombinator.com/newest",
-        "https://www.reuters.com/technology/",
-        
-        // Academic sources
+        "https://news.ycombinator.com/best",
+
+        // Academic Sources
         "https://arxiv.org/list/cs.AI/recent",
+        "https://arxiv.org/list/cs.LG/recent",
         "https://scholar.google.com/citations?view_op=search_venues&hl=en&vq=computer+science",
-        
-        // Additional diverse sources
-        "https://httpbin.org/status/200",
-        "https://httpbin.org/json",
-        "https://httpbin.org/xml"
+
+        // Reliable Testing Endpoints
+        "https://httpbin.org/stream/100",       // streaming
+        "https://httpbin.org/delay/5",          // timeout test
+        "https://httpbin.org/status/418",       // edge HTTP codes
+        "https://httpbin.org/bytes/1024",       // binary data
+        "https://httpbin.org/user-agent"        // header echo
     };
     
     // Seed the frontier

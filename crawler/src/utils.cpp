@@ -1186,7 +1186,7 @@
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = domain_errors_.find(domain);
         if (it != domain_errors_.end()) {
-            return it->second.consecutive_timeouts >= 5; // Blacklist after 5 consecutive timeouts
+            return it->second.consecutive_timeouts >= 15; // Blacklist after 5 consecutive timeouts
         }
         return false;
     }

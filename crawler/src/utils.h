@@ -335,7 +335,7 @@ class DomainBlacklist {
 private:
     mutable std::mutex mutex_;
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> blacklist_;
-    const std::chrono::minutes cooldown_{30};
+    const std::chrono::seconds cooldown_{60};
     std::unordered_set<std::string> permanent_blacklist_;
 
 public:
