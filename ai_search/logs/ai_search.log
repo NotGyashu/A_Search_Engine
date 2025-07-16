@@ -1,0 +1,242 @@
+2025-07-16 08:59:04,015 - backend.api - INFO - Starting AI Search Engine API Server...
+2025-07-16 08:59:04,441 - backend.api - INFO - Starting AI Search Engine API Server...
+2025-07-16 08:59:04,441 - backend.api - INFO - Starting AI Search Engine API Server...
+2025-07-16 08:59:04,441 - backend.api - INFO - Initializing modular search engine...
+2025-07-16 08:59:04,441 - backend.api - INFO - Initializing modular search engine...
+2025-07-16 08:59:04,441 - performance.Search Engine Initialization - INFO - Starting Search Engine Initialization
+2025-07-16 08:59:04,441 - performance.BM25 Index Build - INFO - Starting BM25 Index Build
+2025-07-16 08:59:04,441 - backend.search.bm25 - INFO - Building BM25 search index...
+2025-07-16 08:59:16,099 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 500/22833 documents (11.657s elapsed)
+2025-07-16 08:59:16,831 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 1000/22833 documents (12.389s elapsed)
+2025-07-16 08:59:18,353 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 1500/22833 documents (13.911s elapsed)
+2025-07-16 08:59:18,943 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 2000/22833 documents (14.501s elapsed)
+2025-07-16 08:59:19,531 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 2500/22833 documents (15.090s elapsed)
+2025-07-16 08:59:20,283 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 3000/22833 documents (15.842s elapsed)
+2025-07-16 08:59:21,244 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 3500/22833 documents (16.802s elapsed)
+2025-07-16 08:59:21,616 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 4000/22833 documents (17.174s elapsed)
+2025-07-16 08:59:22,014 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 4500/22833 documents (17.573s elapsed)
+2025-07-16 08:59:22,494 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 5000/22833 documents (18.052s elapsed)
+2025-07-16 08:59:22,982 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 5500/22833 documents (18.540s elapsed)
+2025-07-16 08:59:23,706 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 6000/22833 documents (19.264s elapsed)
+2025-07-16 08:59:24,620 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 6500/22833 documents (20.179s elapsed)
+2025-07-16 08:59:25,506 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 7000/22833 documents (21.065s elapsed)
+2025-07-16 08:59:26,381 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 7500/22833 documents (21.940s elapsed)
+2025-07-16 08:59:26,956 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 8000/22833 documents (22.515s elapsed)
+2025-07-16 08:59:27,335 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 8500/22833 documents (22.894s elapsed)
+2025-07-16 08:59:27,864 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 9000/22833 documents (23.423s elapsed)
+2025-07-16 08:59:28,240 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 9500/22833 documents (23.799s elapsed)
+2025-07-16 08:59:28,876 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 10000/22833 documents (24.435s elapsed)
+2025-07-16 08:59:29,584 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 10500/22833 documents (25.142s elapsed)
+2025-07-16 08:59:29,959 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 11000/22833 documents (25.517s elapsed)
+2025-07-16 08:59:30,616 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 11500/22833 documents (26.175s elapsed)
+2025-07-16 08:59:31,209 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 12000/22833 documents (26.767s elapsed)
+2025-07-16 08:59:31,680 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 12500/22833 documents (27.239s elapsed)
+2025-07-16 08:59:32,122 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 13000/22833 documents (27.681s elapsed)
+2025-07-16 08:59:32,631 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 13500/22833 documents (28.190s elapsed)
+2025-07-16 08:59:33,264 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 14000/22833 documents (28.822s elapsed)
+2025-07-16 08:59:33,731 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 14500/22833 documents (29.290s elapsed)
+2025-07-16 08:59:34,307 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 15000/22833 documents (29.865s elapsed)
+2025-07-16 08:59:34,973 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 15500/22833 documents (30.532s elapsed)
+2025-07-16 08:59:36,052 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 16000/22833 documents (31.611s elapsed)
+2025-07-16 08:59:36,666 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 16500/22833 documents (32.225s elapsed)
+2025-07-16 08:59:37,321 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 17000/22833 documents (32.879s elapsed)
+2025-07-16 08:59:38,212 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 17500/22833 documents (33.770s elapsed)
+2025-07-16 08:59:39,246 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 18000/22833 documents (34.805s elapsed)
+2025-07-16 08:59:39,935 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 18500/22833 documents (35.494s elapsed)
+2025-07-16 08:59:40,622 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 19000/22833 documents (36.180s elapsed)
+2025-07-16 08:59:41,040 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 19500/22833 documents (36.599s elapsed)
+2025-07-16 08:59:41,897 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 20000/22833 documents (37.455s elapsed)
+2025-07-16 08:59:42,514 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 20500/22833 documents (38.073s elapsed)
+2025-07-16 08:59:43,174 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 21000/22833 documents (38.733s elapsed)
+2025-07-16 08:59:43,925 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 21500/22833 documents (39.484s elapsed)
+2025-07-16 08:59:44,826 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 22000/22833 documents (40.385s elapsed)
+2025-07-16 08:59:45,362 - performance.BM25 Index Build - INFO - BM25 Index Build - Processed 22500/22833 documents (40.921s elapsed)
+2025-07-16 08:59:45,853 - backend.search.bm25 - INFO - BM25 index built: 22833 docs, 582713 terms
+2025-07-16 08:59:45,853 - performance.BM25 Index Build - INFO - Completed BM25 Index Build in 41.412s
+2025-07-16 08:59:56,668 - backend.search.ai_enhancer - INFO - AI Models available: smart_template, transformers
+2025-07-16 08:59:56,668 - performance.Search Engine Initialization - INFO - Completed Search Engine Initialization in 52.227s
+2025-07-16 08:59:56,669 - backend.search.engine - INFO - Search engine initialized successfully
+2025-07-16 08:59:56,669 - backend.api - INFO - Search engine initialized successfully!
+2025-07-16 08:59:56,669 - backend.api - INFO - Search engine initialized successfully!
+2025-07-16 09:01:22,198 - performance.API Search: machine learning - INFO - Starting API Search: machine learning
+2025-07-16 09:01:22,199 - performance.Complete Search: machine learning - INFO - Starting Complete Search: machine learning
+2025-07-16 09:01:22,199 - performance.BM25 Search: machine learning - INFO - Starting BM25 Search: machine learning
+2025-07-16 09:01:22,207 - performance.BM25 Search: machine learning - INFO - BM25 Search: machine learning - Found 3085 candidate documents (0.008s elapsed)
+2025-07-16 09:01:22,290 - performance.BM25 Search: machine learning - INFO - Completed BM25 Search: machine learning in 0.091s
+2025-07-16 09:01:22,291 - performance.Complete Search: machine learning - INFO - Complete Search: machine learning - BM25 search completed (0.092s elapsed)
+2025-07-16 09:01:22,294 - performance.Complete Search: machine learning - INFO - Complete Search: machine learning - AI summary generated (0.095s elapsed)
+2025-07-16 09:01:22,294 - performance.Complete Search: machine learning - INFO - Completed Complete Search: machine learning in 0.095s
+2025-07-16 09:01:22,294 - performance.API Search: machine learning - INFO - Completed API Search: machine learning in 0.097s
+2025-07-16 09:01:50,604 - backend.api - INFO - Shutting down AI Search Engine API Server...
+2025-07-16 09:01:50,604 - backend.api - INFO - Shutting down AI Search Engine API Server...
+2025-07-16 11:57:11,740 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-16 11:57:11,741 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-16 11:57:11,741 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-16 11:57:11,741 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-16 11:57:11,749 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-16 11:57:11,749 - backend.search - INFO - Building search index...
+2025-07-16 11:57:11,749 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-16 11:57:22,922 - backend.database - INFO - Retrieved 22833 documents
+2025-07-16 11:57:22,922 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 11.173s
+2025-07-16 11:59:27,051 - backend.search - INFO - Index built: 22833 documents, 582713 unique terms, avg length: 968.0
+2025-07-16 11:59:27,052 - performance.Search Index Build - INFO - Completed Search Index Build in 135.303s
+2025-07-16 11:59:27,053 - backend.ai - INFO - OpenAI not installed
+2025-07-16 11:59:32,085 - backend.ai - INFO - Transformers models available
+2025-07-16 11:59:32,085 - backend.ai - INFO - Ollama models potentially available
+2025-07-16 11:59:32,086 - backend.ai - INFO - Available AI models: ['smart_template', 'transformers', 'ollama']
+2025-07-16 11:59:32,086 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-16 12:10:34,898 - backend.api.server - INFO - Request: GET /
+2025-07-16 12:10:34,913 - backend.api.server - INFO - Response: 200 in 17.43ms
+2025-07-16 12:11:15,002 - backend.api.server - INFO - Request: GET /api/docs
+2025-07-16 12:11:15,008 - backend.api.server - INFO - Response: 200 in 6.19ms
+2025-07-16 12:11:15,591 - backend.api.server - INFO - Request: GET /api/openapi.json
+2025-07-16 12:11:15,660 - backend.api.server - INFO - Response: 200 in 68.82ms
+2025-07-16 12:11:43,276 - backend.api.server - INFO - Request: POST /api/search
+2025-07-16 12:11:43,408 - backend.search - INFO - Search completed: 'what is machine learning' -> 10 results in 116.11ms
+2025-07-16 12:11:43,409 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:11:43,410 - backend.api.routes - INFO - Search API: 'what is machine learning' -> 10 results in 118.6ms
+2025-07-16 12:11:43,414 - backend.api.server - INFO - Response: 200 in 138.12ms
+2025-07-16 12:12:53,676 - backend.api.server - INFO - Request: GET /api/search
+2025-07-16 12:12:53,718 - backend.search - INFO - Search completed: 'what is machine learning' -> 10 results in 21.24ms
+2025-07-16 12:12:53,719 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:12:53,720 - backend.api.routes - INFO - Search API: 'what is machine learning' -> 10 results in 22.44ms
+2025-07-16 12:12:53,720 - backend.api.server - INFO - Response: 200 in 44.31ms
+2025-07-16 12:13:27,715 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:13:39,003 - backend.api.server - INFO - Response: 200 in 11288.29ms
+2025-07-16 12:14:10,535 - backend.api.server - INFO - Request: GET /api/config
+2025-07-16 12:14:10,535 - backend.api.routes - ERROR - Config API error: name 'AI_SUMMARY_MAX_LENGTH' is not defined
+2025-07-16 12:14:10,536 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get configuration: name 'AI_SUMMARY_MAX_LENGTH' is not defined
+2025-07-16 12:14:10,540 - backend.api.server - ERROR - Unexpected error: Object of type datetime is not JSON serializable
+2025-07-16 12:14:10,554 - backend.api.server - ERROR - Traceback (most recent call last):
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/anyio/streams/memory.py", line 91, in receive_nowait
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 162, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/api/server.py", line 62, in log_requests
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 88, in __call__
+    response = await handler(request, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/api/server.py", line 156, in http_exception_handler
+    return JSONResponse(
+           ^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 196, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 55, in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 199, in render
+    return json.dumps(
+           ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type datetime is not JSON serializable
+
+2025-07-16 12:39:35,881 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:39:35,950 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:39:36,017 - backend.api.server - INFO - Request: GET /favicon.ico
+2025-07-16 12:39:36,153 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-16 12:39:36,504 - backend.search - INFO - Search completed: 'test' -> 1 results in 122.63ms
+2025-07-16 12:39:36,508 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:39:36,554 - backend.api.server - INFO - Response: 404 in 536.44ms
+2025-07-16 12:39:46,523 - backend.api.server - INFO - Response: 200 in 10676.06ms
+2025-07-16 12:39:46,524 - backend.api.server - INFO - Response: 200 in 10574.07ms
+2025-07-16 12:39:46,524 - backend.api.server - INFO - Response: 404 in 10370.97ms
+2025-07-16 12:39:46,849 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:39:46,872 - backend.search - INFO - Search completed: 'test' -> 1 results in 4.34ms
+2025-07-16 12:39:46,873 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:39:46,874 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:39:46,874 - backend.api.server - INFO - Response: 200 in 24.85ms
+2025-07-16 12:39:56,602 - backend.api.server - INFO - Request: POST /api/search
+2025-07-16 12:39:56,603 - backend.api.server - INFO - Response: 200 in 9728.77ms
+2025-07-16 12:39:56,689 - backend.search - INFO - Search completed: 'github' -> 10 results in 44.1ms
+2025-07-16 12:39:56,691 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:39:56,697 - backend.api.routes - INFO - Search API: 'github' -> 10 results in 51.01ms
+2025-07-16 12:39:56,708 - backend.api.server - INFO - Response: 200 in 105.8ms
+2025-07-16 12:41:31,131 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:41:31,159 - backend.search - INFO - Search completed: 'test' -> 1 results in 14.62ms
+2025-07-16 12:41:31,160 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:41:31,161 - backend.api.server - INFO - Response: 200 in 30.33ms
+2025-07-16 12:41:31,317 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:41:31,475 - backend.api.server - INFO - Response: 200 in 157.9ms
+2025-07-16 12:41:31,483 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:41:31,500 - backend.search - INFO - Search completed: 'test' -> 1 results in 13.47ms
+2025-07-16 12:41:31,501 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:41:31,501 - backend.api.server - INFO - Response: 200 in 17.64ms
+2025-07-16 12:41:31,530 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-16 12:41:31,531 - backend.api.server - INFO - Response: 404 in 0.71ms
+2025-07-16 12:41:31,798 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:41:31,870 - backend.api.server - INFO - Response: 200 in 72.86ms
+2025-07-16 12:41:35,629 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:41:35,630 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-16 12:41:35,630 - backend.api.server - INFO - Response: 404 in 0.51ms
+2025-07-16 12:41:35,639 - backend.search - INFO - Search completed: 'test' -> 1 results in 5.95ms
+2025-07-16 12:41:35,640 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:41:35,642 - backend.api.server - INFO - Response: 200 in 12.47ms
+2025-07-16 12:41:35,741 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:41:35,947 - backend.api.server - INFO - Response: 200 in 206.45ms
+2025-07-16 12:41:35,950 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:41:35,959 - backend.search - INFO - Search completed: 'test' -> 1 results in 5.91ms
+2025-07-16 12:41:35,959 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:41:35,962 - backend.api.server - INFO - Response: 200 in 12.15ms
+2025-07-16 12:41:36,252 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:41:36,349 - backend.api.server - INFO - Response: 200 in 96.81ms
+2025-07-16 12:41:58,701 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:41:58,712 - backend.search - INFO - Search completed: 'test' -> 1 results in 8.02ms
+2025-07-16 12:41:58,713 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:41:58,713 - backend.api.server - INFO - Response: 200 in 12.03ms
+2025-07-16 12:41:58,796 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:41:58,924 - backend.api.server - INFO - Response: 200 in 128.07ms
+2025-07-16 12:41:59,003 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-16 12:41:59,003 - backend.api.server - INFO - Response: 404 in 0.7ms
+2025-07-16 12:41:59,024 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:41:59,030 - backend.search - INFO - Search completed: 'test' -> 1 results in 3.77ms
+2025-07-16 12:41:59,031 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:41:59,032 - backend.api.server - INFO - Response: 200 in 7.24ms
+2025-07-16 12:41:59,233 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:41:59,336 - backend.api.server - INFO - Response: 200 in 103.1ms
+2025-07-16 12:43:42,978 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:43:42,996 - backend.search - INFO - Search completed: 'test' -> 1 results in 9.57ms
+2025-07-16 12:43:42,996 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:43:42,997 - backend.api.server - INFO - Response: 200 in 18.34ms
+2025-07-16 12:43:43,080 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:43:43,183 - backend.api.server - INFO - Response: 200 in 102.46ms
+2025-07-16 12:43:43,279 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-16 12:43:43,280 - backend.api.server - INFO - Response: 404 in 0.75ms
+2025-07-16 12:43:43,308 - backend.api.server - INFO - Request: GET /api/health
+2025-07-16 12:43:43,314 - backend.search - INFO - Search completed: 'test' -> 1 results in 3.79ms
+2025-07-16 12:43:43,315 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-16 12:43:43,315 - backend.api.server - INFO - Response: 200 in 6.8ms
+2025-07-16 12:43:43,492 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-16 12:43:43,577 - backend.api.server - INFO - Response: 200 in 84.66ms
+2025-07-16 12:46:14,920 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...

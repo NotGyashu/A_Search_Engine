@@ -21,10 +21,14 @@ data/
 .idea/
 .gitignore
 
+#cache
+__pycache__
+node_modules/
+
 # Compiled files
 *.o
 *.so
 *.a
 
 # Executables
-
+RawHTMLdata

@@ -33,7 +33,7 @@ def analyze_json_file(file_path):
 
 if __name__ == "__main__":
     # Analyze the first JSON file
-    json_files = list(Path("data/raw").glob("*.json"))
+    json_files = list(Path("../../../Data/Raw").glob("*.json"))
     if json_files:
         analyze_json_file(json_files[0])
     else:
