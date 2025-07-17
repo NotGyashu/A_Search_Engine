@@ -1,5 +1,4 @@
-"""
-Search Service - Core search functionality using BM25 algorithm
+""" # Search Service - Core search functionality using BM25 algorithm
 Clean, modular implementation with proper separation of concerns
 """
 
@@ -118,8 +117,8 @@ class SearchService:
             self.avg_doc_length = total_length / self.total_docs if self.total_docs > 0 else 0
             
             self.logger.info(f"Index built: {self.total_docs} documents, "
-                           f"{len(self.term_freq)} unique terms, "
-                           f"avg length: {self.avg_doc_length:.1f}")
+                        f"{len(self.term_freq)} unique terms, "
+                        f"avg length: {self.avg_doc_length:.1f}")
     
     def _calculate_bm25_score(self, query_terms: List[str], doc_id: int) -> float:
         """Calculate BM25 score for a document"""

@@ -13,7 +13,7 @@ namespace CrawlerConstants {
 
 // =============== WORKER CONFIGURATION ===============
 namespace Workers {
-    constexpr int DEFAULT_MAX_THREADS = 6;              // Default network workers
+    constexpr int DEFAULT_MAX_THREADS = 4;              // Default network workers
     constexpr int MIN_THREADS = 1;                      // Minimum worker threads
     constexpr int MAX_THREADS = 32;                     // Maximum worker threads
     constexpr int HTML_WORKER_RATIO = 3;                // Network workers / HTML workers
@@ -24,7 +24,7 @@ namespace Workers {
 namespace Queue {
     constexpr int DEFAULT_MAX_DEPTH = 4;                // Default crawl depth
     constexpr int DEFAULT_MAX_QUEUE_SIZE = 500000;      // Default main queue size
-    constexpr int MAX_CONCURRENT_REQUESTS = 30;         // Max concurrent requests per worker
+    constexpr int MAX_CONCURRENT_REQUESTS = 45;         // Max concurrent requests per worker
     constexpr int MAX_QUEUE_DRAIN_ATTEMPTS = 100;       // Max attempts to drain queue
     constexpr int DISK_LOAD_BATCH_SIZE = 1000;           // URLs loaded from disk per batch
     constexpr int REFILL_THRESHOLD = 1000;               // Refill main queue when below this
@@ -153,7 +153,7 @@ namespace Headers {
 namespace Paths {
     constexpr const char* DB_PATH = "../data/processed/hybrid_crawl_metadata.db";
     constexpr const char* LOG_PATH = "../data/processed/hybrid_crawl_log.csv";
-    constexpr const char* RAW_DATA_PATH = "../../Data/Raw";
+    constexpr const char* RAW_DATA_PATH = "../../RawHTMLdata";
     constexpr const char* BLACKLIST_PATH = "../config/blacklist.txt";
     constexpr const char* SHARDED_DISK_PATH = "../data";
 }

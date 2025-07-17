@@ -240,3 +240,575 @@ TypeError: Object of type datetime is not JSON serializable
 2025-07-16 12:43:43,492 - backend.api.server - INFO - Request: GET /api/stats
 2025-07-16 12:43:43,577 - backend.api.server - INFO - Response: 200 in 84.66ms
 2025-07-16 12:46:14,920 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-16 14:51:13,599 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-16 14:51:13,601 - backend.search - INFO - Building search index...
+2025-07-16 14:51:13,601 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-16 14:51:24,455 - backend.database - INFO - Retrieved 22833 documents
+2025-07-16 14:51:24,456 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 10.855s
+2025-07-16 14:53:26,896 - performance.Search Index Build - INFO - Completed Search Index Build in 133.283s
+2025-07-16 18:38:35,578 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-16 18:38:35,580 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-16 18:38:35,580 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-16 18:38:35,580 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-16 18:38:35,589 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-16 18:38:35,590 - backend.search - INFO - Building search index...
+2025-07-16 18:38:35,590 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-16 18:38:36,384 - backend.database - INFO - Retrieved 517 documents
+2025-07-16 18:38:36,384 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 0.794s
+2025-07-16 18:38:38,020 - backend.search - INFO - Index built: 517 documents, 267944 unique terms, avg length: 2856.4
+2025-07-16 18:38:38,021 - performance.Search Index Build - INFO - Completed Search Index Build in 2.431s
+2025-07-16 18:38:38,021 - backend.ai - INFO - OpenAI not installed
+2025-07-16 18:38:44,171 - backend.ai - INFO - Transformers models available
+2025-07-16 18:38:44,172 - backend.ai - INFO - Ollama models potentially available
+2025-07-16 18:38:44,172 - backend.ai - INFO - Available AI models: ['smart_template', 'transformers', 'ollama']
+2025-07-16 18:38:44,172 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-16 18:38:51,198 - backend.api.server - INFO - Request: GET /
+2025-07-16 18:38:51,198 - backend.api.server - INFO - Response: 200 in 0.75ms
+2025-07-16 18:39:13,225 - backend.api.server - INFO - Request: GET /api/docs
+2025-07-16 18:39:13,226 - backend.api.server - INFO - Response: 200 in 1.03ms
+2025-07-16 18:39:13,500 - backend.api.server - INFO - Request: GET /api/openapi.json
+2025-07-16 18:39:13,516 - backend.api.server - INFO - Response: 200 in 15.58ms
+2025-07-16 18:43:37,585 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 08:34:31,471 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 08:34:31,474 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 08:34:31,474 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 08:34:31,474 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 08:34:31,481 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 08:34:31,481 - backend.search - INFO - Building search index...
+2025-07-17 08:34:31,481 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 08:34:32,206 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 08:34:32,207 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 0.725s
+2025-07-17 08:34:43,629 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 08:34:43,630 - performance.Search Index Build - INFO - Completed Search Index Build in 12.149s
+2025-07-17 08:34:43,631 - backend.ai - INFO - OpenAI not installed
+2025-07-17 08:34:51,793 - backend.ai - INFO - Transformers models available
+2025-07-17 08:34:51,794 - backend.ai - INFO - Ollama models potentially available
+2025-07-17 08:34:51,794 - backend.ai - INFO - Available AI models: ['smart_template', 'transformers', 'ollama']
+2025-07-17 08:34:51,794 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 08:37:58,136 - backend.api.server - INFO - Request: GET /
+2025-07-17 08:37:58,138 - backend.api.server - INFO - Response: 200 in 2.51ms
+2025-07-17 08:38:02,271 - backend.api.server - INFO - Request: GET /api/docs
+2025-07-17 08:38:02,273 - backend.api.server - INFO - Response: 200 in 1.85ms
+2025-07-17 08:38:02,408 - backend.api.server - INFO - Request: GET /api/openapi.json
+2025-07-17 08:38:02,429 - backend.api.server - INFO - Response: 200 in 21.19ms
+2025-07-17 08:38:27,271 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 08:38:27,274 - backend.api.routes - ERROR - Search API error: 'EnhancedSearchService' object has no attribute 'MAX_SEARCH_LIMIT'
+2025-07-17 08:38:27,275 - backend.api.server - WARNING - HTTP Exception: 500 - Internal server error: 'EnhancedSearchService' object has no attribute 'MAX_SEARCH_LIMIT'
+2025-07-17 08:38:27,275 - backend.api.server - ERROR - Unexpected error: Object of type datetime is not JSON serializable
+2025-07-17 08:38:27,284 - backend.api.server - ERROR - Traceback (most recent call last):
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/anyio/streams/memory.py", line 93, in receive_nowait
+    raise WouldBlock
+anyio.WouldBlock
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/anyio/streams/memory.py", line 118, in receive
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 162, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/api/server.py", line 62, in log_requests
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 91, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 146, in simple_response
+    await self.app(scope, receive, send)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 88, in __call__
+    response = await handler(request, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/api/server.py", line 156, in http_exception_handler
+    return JSONResponse(
+           ^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 196, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 55, in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 199, in render
+    return json.dumps(
+           ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type datetime is not JSON serializable
+
+2025-07-17 11:38:13,717 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 11:38:40,947 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 11:38:40,947 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 11:38:40,947 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 11:38:40,947 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 11:38:40,976 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 11:38:40,976 - backend.search - INFO - Building search index...
+2025-07-17 11:38:40,976 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 11:38:45,170 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 11:38:45,172 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 4.196s
+2025-07-17 11:39:00,160 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 11:39:00,161 - performance.Search Index Build - INFO - Completed Search Index Build in 19.185s
+2025-07-17 11:39:00,162 - backend.ai - INFO - OpenAI not installed
+2025-07-17 11:39:09,073 - backend.ai - INFO - Transformers models available
+2025-07-17 11:39:09,073 - backend.ai - INFO - Ollama models potentially available
+2025-07-17 11:39:09,074 - backend.ai - INFO - Available AI models: ['smart_template', 'transformers', 'ollama']
+2025-07-17 11:39:09,074 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 11:39:16,766 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:39:16,814 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:39:16,816 - backend.api.routes - INFO - Search API: 'machine learning' -> 10 results in 46.54ms
+2025-07-17 11:39:16,818 - backend.api.server - INFO - Response: 200 in 52.03ms
+2025-07-17 11:40:11,322 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 11:40:11,325 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 11:40:11,524 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:40:11,984 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-17 11:40:11,985 - backend.api.server - INFO - Response: 200 in 663.2ms
+2025-07-17 11:40:11,985 - backend.api.server - INFO - Response: 200 in 660.19ms
+2025-07-17 11:40:11,986 - backend.api.server - INFO - Response: 404 in 2.04ms
+2025-07-17 11:40:12,002 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 11:40:12,002 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-17 11:40:12,003 - backend.api.server - INFO - Response: 404 in 0.45ms
+2025-07-17 11:40:12,027 - backend.api.server - INFO - Response: 200 in 25.53ms
+2025-07-17 11:40:12,318 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 11:40:12,329 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:40:12,330 - backend.api.server - INFO - Response: 200 in 11.73ms
+2025-07-17 11:40:12,364 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 11:40:12,383 - backend.api.server - INFO - Response: 200 in 19.05ms
+2025-07-17 11:40:12,663 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 11:40:12,674 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:40:12,675 - backend.api.server - INFO - Response: 200 in 11.83ms
+2025-07-17 11:40:12,711 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 11:40:12,728 - backend.api.server - INFO - Response: 200 in 16.83ms
+2025-07-17 11:40:13,004 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 11:40:13,019 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:40:13,020 - backend.api.server - INFO - Response: 200 in 16.01ms
+2025-07-17 11:40:18,813 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:40:18,852 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:40:18,852 - backend.api.routes - INFO - Search API: 'machine learning' -> 10 results in 37.55ms
+2025-07-17 11:40:18,853 - backend.api.server - INFO - Response: 200 in 39.47ms
+2025-07-17 11:41:04,960 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:41:04,971 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:41:04,972 - backend.api.routes - INFO - Search API: 'python' -> 10 results in 8.68ms
+2025-07-17 11:41:04,972 - backend.api.server - INFO - Response: 200 in 12.14ms
+2025-07-17 11:41:08,430 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:41:08,434 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:41:08,434 - backend.api.routes - INFO - Search API: 'python' -> 10 results in 2.56ms
+2025-07-17 11:41:08,434 - backend.api.server - INFO - Response: 200 in 4.04ms
+2025-07-17 11:41:38,867 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:41:38,872 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:41:38,873 - backend.api.routes - INFO - Search API: 'python' -> 10 results in 4.03ms
+2025-07-17 11:41:38,874 - backend.api.server - INFO - Response: 200 in 6.61ms
+2025-07-17 11:42:04,393 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:42:04,403 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:42:04,404 - backend.api.routes - INFO - Search API: 'MIT' -> 10 results in 9.61ms
+2025-07-17 11:42:04,404 - backend.api.server - INFO - Response: 200 in 11.49ms
+2025-07-17 11:42:27,102 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:42:27,106 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:42:27,107 - backend.api.routes - INFO - Search API: 'MIT' -> 10 results in 3.22ms
+2025-07-17 11:42:27,107 - backend.api.server - INFO - Response: 200 in 5.32ms
+2025-07-17 11:43:37,652 - backend.api.server - INFO - Request: GET /api/config
+2025-07-17 11:43:37,653 - backend.api.routes - ERROR - Config API error: name 'AI_SUMMARY_MAX_LENGTH' is not defined
+2025-07-17 11:43:37,653 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get configuration: name 'AI_SUMMARY_MAX_LENGTH' is not defined
+2025-07-17 11:43:37,656 - backend.api.server - ERROR - Unexpected error: Object of type datetime is not JSON serializable
+2025-07-17 11:43:37,666 - backend.api.server - ERROR - Traceback (most recent call last):
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 78, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/anyio/streams/memory.py", line 98, in receive
+    return self.receive_nowait()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/anyio/streams/memory.py", line 91, in receive_nowait
+    raise EndOfStream
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 162, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 108, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/api/server.py", line 62, in log_requests
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 84, in call_next
+    raise app_exc
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 70, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 88, in __call__
+    response = await handler(request, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/api/server.py", line 156, in http_exception_handler
+    return JSONResponse(
+           ^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 196, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 55, in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/gyashu/projects/mini_search_engine/ai_search/backend/venv/lib/python3.12/site-packages/starlette/responses.py", line 199, in render
+    return json.dumps(
+           ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type datetime is not JSON serializable
+
+2025-07-17 11:45:34,300 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 11:45:34,384 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:45:34,388 - backend.api.server - INFO - Response: 200 in 87.94ms
+2025-07-17 11:52:05,139 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 11:52:09,190 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 11:52:09,190 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 11:52:09,191 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 11:52:09,191 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 11:52:09,203 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 11:52:09,203 - backend.search - INFO - Building search index...
+2025-07-17 11:52:09,203 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 11:52:11,245 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 11:52:11,247 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 2.043s
+2025-07-17 11:52:27,255 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 11:52:27,256 - performance.Search Index Build - INFO - Completed Search Index Build in 18.053s
+2025-07-17 11:52:27,256 - backend.ai - INFO - OpenAI not installed
+2025-07-17 11:52:37,387 - backend.ai - INFO - Transformers models available
+2025-07-17 11:52:37,388 - backend.ai - INFO - Ollama models potentially available
+2025-07-17 11:52:37,388 - backend.ai - INFO - Available AI models: ['smart_template', 'transformers', 'ollama']
+2025-07-17 11:52:37,388 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 11:52:41,431 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:52:41,444 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:52:41,445 - backend.api.routes - INFO - Search API: 'MIT' -> 10 results in 9.02ms
+2025-07-17 11:52:41,451 - backend.api.server - INFO - Response: 200 in 20.42ms
+2025-07-17 11:52:53,513 - backend.api.server - INFO - Request: GET /api/config
+2025-07-17 11:52:53,514 - backend.api.routes - ERROR - Config API error: name 'AI_SUMMARY_MAX_LENGTH' is not defined
+2025-07-17 11:52:53,514 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get configuration: name 'AI_SUMMARY_MAX_LENGTH' is not defined
+2025-07-17 11:52:53,516 - backend.api.server - INFO - Response: 500 in 3.14ms
+2025-07-17 11:54:54,660 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 11:54:57,827 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 11:54:57,828 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 11:54:57,828 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 11:54:57,828 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 11:54:57,854 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 11:54:57,854 - backend.search - INFO - Building search index...
+2025-07-17 11:54:57,855 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 11:54:59,958 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 11:54:59,959 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 2.104s
+2025-07-17 11:55:13,580 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 11:55:13,581 - performance.Search Index Build - INFO - Completed Search Index Build in 15.727s
+2025-07-17 11:55:13,582 - backend.ai - INFO - OpenAI not installed
+2025-07-17 11:55:17,953 - backend.ai - INFO - Transformers models available
+2025-07-17 11:55:17,954 - backend.ai - INFO - Ollama models potentially available
+2025-07-17 11:55:17,954 - backend.ai - INFO - Available AI models: ['smart_template', 'transformers', 'ollama']
+2025-07-17 11:55:17,954 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 11:55:32,183 - backend.api.server - INFO - Request: GET /api/config
+2025-07-17 11:55:32,184 - backend.api.routes - ERROR - Config API error: name 'AI_FALLBACK_ENABLED' is not defined
+2025-07-17 11:55:32,184 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get configuration: name 'AI_FALLBACK_ENABLED' is not defined
+2025-07-17 11:55:32,185 - backend.api.server - INFO - Response: 500 in 2.09ms
+2025-07-17 11:57:35,034 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 11:57:37,222 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 11:57:37,222 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 11:57:37,222 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 11:57:37,222 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 11:57:37,229 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 11:57:37,229 - backend.search - INFO - Building search index...
+2025-07-17 11:57:37,229 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 11:57:37,527 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 11:57:37,528 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 0.299s
+2025-07-17 11:57:51,772 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 11:57:51,772 - performance.Search Index Build - INFO - Completed Search Index Build in 14.543s
+2025-07-17 11:57:51,773 - backend.ai - INFO - OpenAI not installed
+2025-07-17 11:57:53,830 - backend.ai - INFO - Transformers models available
+2025-07-17 11:57:53,830 - backend.ai - INFO - Ollama models potentially available
+2025-07-17 11:57:53,830 - backend.ai - INFO - Available AI models: ['smart_template', 'transformers', 'ollama']
+2025-07-17 11:57:53,830 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 11:58:01,151 - backend.api.server - INFO - Request: GET /api/config
+2025-07-17 11:58:01,153 - backend.api.server - INFO - Response: 200 in 2.37ms
+2025-07-17 11:58:43,037 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 11:58:43,168 - backend.ai - INFO - Attempting summary with smart_template
+2025-07-17 11:58:43,168 - backend.api.routes - INFO - Search API: 'how to stay healthy' -> 10 results in 127.85ms
+2025-07-17 11:58:43,169 - backend.api.server - INFO - Response: 200 in 132.43ms
+2025-07-17 12:05:56,240 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 12:42:55,423 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 12:42:55,424 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 12:42:55,424 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 12:42:55,424 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 12:42:53,799 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 12:42:53,800 - backend.search - INFO - Building search index...
+2025-07-17 12:42:53,800 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 12:42:55,207 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 12:42:55,208 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 1.408s
+2025-07-17 12:43:08,720 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 12:43:08,720 - performance.Search Index Build - INFO - Completed Search Index Build in 14.921s
+2025-07-17 12:43:09,470 - backend.ai - INFO - OpenAI GPT models available
+2025-07-17 12:43:15,272 - backend.ai - INFO - Transformers models available
+2025-07-17 12:43:15,272 - backend.ai - INFO - Ollama models potentially available
+2025-07-17 12:43:15,272 - backend.ai - INFO - Available AI models: ['smart_template', 'openai_gpt', 'transformers', 'ollama']
+2025-07-17 12:43:15,272 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 12:43:25,470 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 12:43:25,584 - backend.ai - INFO - Attempting summary with openai_gpt
+2025-07-17 12:43:32,044 - backend.ai - WARNING - Model openai_gpt failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-07-17 12:43:32,044 - backend.ai - INFO - Attempting summary with ollama
+2025-07-17 12:43:32,051 - backend.ai - WARNING - Model ollama failed: HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7503352d3e90>: Failed to establish a new connection: [Errno 111] Connection refused'))
+2025-07-17 12:43:32,051 - backend.ai - INFO - Attempting summary with transformers
+2025-07-17 12:48:51,895 - backend.api.routes - INFO - Search API: 'how to stay healthy' -> 10 results in 326418.45ms
+2025-07-17 12:48:52,054 - backend.api.server - INFO - Response: 200 in 326583.76ms
+2025-07-17 12:49:57,205 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 12:49:58,382 - backend.ai - INFO - Attempting summary with openai_gpt
+2025-07-17 12:50:01,913 - backend.ai - WARNING - Model openai_gpt failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-07-17 12:50:01,913 - backend.ai - INFO - Attempting summary with ollama
+2025-07-17 12:50:01,948 - backend.ai - WARNING - Model ollama failed: HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x750306ccef30>: Failed to establish a new connection: [Errno 111] Connection refused'))
+2025-07-17 12:50:01,949 - backend.ai - INFO - Attempting summary with transformers
+2025-07-17 12:52:03,668 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 12:52:03,670 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 12:52:03,670 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 12:52:03,670 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 12:52:03,679 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 12:52:03,679 - backend.search - INFO - Building search index...
+2025-07-17 12:52:03,679 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 12:52:04,492 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 12:52:04,493 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 0.814s
+2025-07-17 12:52:15,910 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 12:52:15,911 - performance.Search Index Build - INFO - Completed Search Index Build in 12.232s
+2025-07-17 12:52:16,700 - backend.ai - INFO - OpenAI GPT models available
+2025-07-17 12:52:23,605 - backend.ai - INFO - Transformers models available
+2025-07-17 12:52:23,605 - backend.ai - INFO - Ollama models potentially available
+2025-07-17 12:52:23,605 - backend.ai - INFO - Available AI models: ['smart_template', 'openai_gpt', 'transformers', 'ollama']
+2025-07-17 12:52:23,605 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 12:52:35,646 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 12:52:35,864 - backend.ai - INFO - Attempting summary with openai_gpt
+2025-07-17 12:52:40,702 - backend.ai - WARNING - Model openai_gpt failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-07-17 12:52:40,969 - backend.ai - INFO - Attempting summary with ollama
+2025-07-17 12:52:45,620 - backend.ai - WARNING - Model ollama failed: HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x797490f77ec0>: Failed to establish a new connection: [Errno 111] Connection refused'))
+2025-07-17 12:52:45,621 - backend.ai - INFO - Attempting summary with transformers
+2025-07-17 12:54:05,622 - backend.api.routes - INFO - Search API: 'how to learn machine learnig' -> 10 results in 89966.1ms
+2025-07-17 12:54:05,757 - backend.api.server - INFO - Response: 200 in 90110.85ms
+2025-07-17 12:54:05,850 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 14:33:15,332 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 14:33:15,334 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 14:33:15,334 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 14:33:15,334 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 14:33:15,343 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 14:33:15,344 - backend.search - INFO - Building search index...
+2025-07-17 14:33:15,344 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 14:33:15,615 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 14:33:15,616 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 0.272s
+2025-07-17 14:33:31,399 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 14:33:31,399 - performance.Search Index Build - INFO - Completed Search Index Build in 16.056s
+2025-07-17 14:33:31,400 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 14:33:39,202 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 14:33:39,213 - backend.ai_client - INFO - Calling AI Runner for query: 'python programming'
+2025-07-17 14:33:39,218 - backend.ai_client - INFO - AI summary generated using smart_template
+2025-07-17 14:33:39,219 - backend.api.routes - INFO - Search API: 'python programming' -> 3 results in 13.85ms
+2025-07-17 14:33:39,219 - backend.api.server - INFO - Response: 200 in 17.08ms
+2025-07-17 14:35:17,725 - backend.api.server - INFO - Request: GET /api/docs
+2025-07-17 14:35:17,727 - backend.api.server - INFO - Response: 200 in 1.32ms
+2025-07-17 14:35:18,118 - backend.api.server - INFO - Request: GET /api/openapi.json
+2025-07-17 14:35:18,153 - backend.api.server - INFO - Response: 200 in 35.13ms
+2025-07-17 14:35:28,157 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 14:35:28,207 - backend.api.server - INFO - Response: 200 in 50.7ms
+2025-07-17 14:43:22,848 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 14:43:23,386 - backend.ai_client - INFO - Calling AI Runner for query: 'what is python language'
+2025-07-17 14:43:23,474 - backend.ai_client - INFO - AI summary generated using smart_template
+2025-07-17 14:43:23,476 - backend.api.routes - INFO - Search API: 'what is python language' -> 10 results in 572.75ms
+2025-07-17 14:43:23,482 - backend.api.server - INFO - Response: 200 in 638.55ms
+2025-07-17 14:48:10,692 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 14:48:10,692 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 14:48:10,692 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 14:48:10,692 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 14:48:10,699 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 14:48:10,699 - backend.search - INFO - Building search index...
+2025-07-17 14:48:10,699 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 14:48:11,372 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 14:48:11,373 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 0.674s
+2025-07-17 14:48:29,195 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 14:48:29,195 - performance.Search Index Build - INFO - Completed Search Index Build in 18.497s
+2025-07-17 14:48:29,196 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 14:48:34,544 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 14:48:34,678 - backend.ai_client - INFO - Calling AI Runner for query: 'how to stay healthy'
+2025-07-17 14:48:34,696 - backend.ai_client - INFO - AI summary generated using smart_template
+2025-07-17 14:48:34,697 - backend.api.routes - INFO - Search API: 'how to stay healthy' -> 10 results in 139.78ms
+2025-07-17 14:48:34,699 - backend.api.server - INFO - Response: 200 in 155.37ms
+2025-07-17 14:54:08,735 - backend.api.server - INFO - 🛑 AI Search Engine API shutting down...
+2025-07-17 14:54:20,659 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 14:54:20,659 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 14:54:20,660 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 14:54:20,660 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 14:54:20,667 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 14:54:20,667 - backend.search - INFO - Building search index...
+2025-07-17 14:54:20,667 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 14:54:21,249 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 14:54:21,249 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 0.582s
+2025-07-17 14:54:38,165 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 14:54:38,166 - performance.Search Index Build - INFO - Completed Search Index Build in 17.499s
+2025-07-17 14:54:38,167 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 14:55:49,908 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 14:55:49,909 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 14:55:50,006 - backend.api.routes - ERROR - Stats API error: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:55:50,007 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get statistics: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:55:50,039 - backend.api.server - INFO - Response: 500 in 131.97ms
+2025-07-17 14:55:50,040 - backend.api.server - INFO - Response: 200 in 131.32ms
+2025-07-17 14:55:50,100 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-17 14:55:50,100 - backend.api.server - INFO - Response: 404 in 0.53ms
+2025-07-17 14:55:50,167 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 14:55:50,201 - backend.api.routes - ERROR - Stats API error: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:55:50,201 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get statistics: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:55:50,202 - backend.api.server - INFO - Response: 500 in 34.34ms
+2025-07-17 14:55:50,379 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 14:55:50,396 - backend.api.server - INFO - Response: 200 in 16.59ms
+2025-07-17 14:55:57,015 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 14:55:57,082 - backend.ai_client - INFO - Calling AI Runner for query: 'machine learning'
+2025-07-17 14:55:57,094 - backend.ai_client - INFO - AI summary generated using smart_template
+2025-07-17 14:55:57,095 - backend.api.routes - INFO - Search API: 'machine learning' -> 10 results in 76.67ms
+2025-07-17 14:55:57,096 - backend.api.server - INFO - Response: 200 in 80.29ms
+2025-07-17 14:56:25,103 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 14:56:25,104 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-17 14:56:25,105 - backend.api.server - INFO - Response: 404 in 1.15ms
+2025-07-17 14:56:25,134 - backend.api.server - INFO - Response: 200 in 31.27ms
+2025-07-17 14:56:25,244 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 14:56:25,294 - backend.api.routes - ERROR - Stats API error: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:56:25,294 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get statistics: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:56:25,295 - backend.api.server - INFO - Response: 500 in 51.05ms
+2025-07-17 14:56:25,475 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 14:56:25,502 - backend.api.server - INFO - Response: 200 in 27.34ms
+2025-07-17 14:56:25,639 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 14:56:25,660 - backend.api.routes - ERROR - Stats API error: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:56:25,660 - backend.api.server - WARNING - HTTP Exception: 500 - Failed to get statistics: 2 validation errors for AIStats
+model_preference
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+default_model
+  Field required [type=missing, input_value={'available_models': ['sm...vice_status': 'healthy'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.5/v/missing
+2025-07-17 14:56:25,660 - backend.api.server - INFO - Response: 500 in 20.96ms
+2025-07-17 17:55:20,379 - backend.api.server - INFO - 🚀 AI Search Engine API starting up...
+2025-07-17 17:55:20,381 - backend.api.server - INFO - 📊 Backend Port: 8000
+2025-07-17 17:55:20,381 - backend.api.server - INFO - 🌐 Frontend Port: 3000
+2025-07-17 17:55:20,381 - backend.api.server - INFO - 🔧 CORS Origins: ['*']
+2025-07-17 17:55:20,389 - performance.Search Index Build - INFO - Starting Search Index Build
+2025-07-17 17:55:20,389 - backend.search - INFO - Building search index...
+2025-07-17 17:55:20,390 - performance.Database: Get all documents - INFO - Starting Database: Get all documents
+2025-07-17 17:55:22,728 - backend.database - INFO - Retrieved 4892 documents
+2025-07-17 17:55:22,731 - performance.Database: Get all documents - INFO - Completed Database: Get all documents in 2.340s
+2025-07-17 17:55:35,328 - backend.search - INFO - Index built: 4892 documents, 142883 unique terms, avg length: 1035.8
+2025-07-17 17:55:35,329 - performance.Search Index Build - INFO - Completed Search Index Build in 14.939s
+2025-07-17 17:55:35,329 - backend.api.server - INFO - ✅ All services initialized successfully
+2025-07-17 17:55:41,312 - backend.api.server - INFO - Request: GET /
+2025-07-17 17:55:41,316 - backend.api.server - INFO - Response: 200 in 3.9ms
+2025-07-17 17:55:45,257 - backend.api.server - INFO - Request: GET /api/docs
+2025-07-17 17:55:45,259 - backend.api.server - INFO - Response: 200 in 2.2ms
+2025-07-17 17:55:45,517 - backend.api.server - INFO - Request: GET /api/openapi.json
+2025-07-17 17:55:45,526 - backend.api.server - INFO - Response: 200 in 8.98ms
+2025-07-17 17:56:00,550 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 17:56:00,730 - backend.ai_client - INFO - Calling AI Runner for query: 'what is machine learning'
+2025-07-17 17:56:03,086 - backend.ai_client - INFO - AI summary generated using smart_template
+2025-07-17 17:56:03,087 - backend.api.routes - INFO - Search API: 'what is machine learning' -> 10 results in 2525.73ms
+2025-07-17 17:56:03,088 - backend.api.server - INFO - Response: 200 in 2537.88ms
+2025-07-17 17:56:56,572 - backend.api.server - INFO - Request: GET /
+2025-07-17 17:56:56,574 - backend.api.server - INFO - Response: 200 in 1.59ms
+2025-07-17 17:58:32,865 - backend.api.server - INFO - Request: GET /api/config
+2025-07-17 17:58:32,869 - backend.api.server - INFO - Response: 200 in 3.79ms
+2025-07-17 17:58:44,687 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 17:58:46,700 - backend.api.server - INFO - Response: 200 in 2012.91ms
+2025-07-17 17:59:04,015 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 17:59:04,531 - backend.api.server - INFO - Response: 200 in 516.46ms
+2025-07-17 18:04:53,059 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 18:04:53,890 - backend.ai_client - INFO - Calling AI Runner for query: 'what is machine learning'
+2025-07-17 18:04:55,975 - backend.ai_client - INFO - AI summary generated using smart_template
+2025-07-17 18:04:55,982 - backend.api.routes - INFO - Search API: 'what is machine learning' -> 10 results in 2863.86ms
+2025-07-17 18:04:56,010 - backend.api.server - INFO - Response: 200 in 2957.16ms
+2025-07-17 18:13:00,459 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 18:13:00,876 - backend.ai_client - INFO - Calling AI Runner for query: 'what is machine learning'
+2025-07-17 18:13:14,067 - backend.ai_client - INFO - AI summary generated using google_gemini
+2025-07-17 18:13:14,072 - backend.api.routes - INFO - Search API: 'what is machine learning' -> 10 results in 13570.68ms
+2025-07-17 18:13:14,200 - backend.api.server - INFO - Response: 200 in 13747.1ms
+2025-07-17 18:14:50,744 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 18:14:50,757 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 18:15:01,747 - backend.ai_client - ERROR - Failed to get AI stats: HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=5)
+2025-07-17 18:15:01,749 - backend.api.server - INFO - Response: 200 in 11005.67ms
+2025-07-17 18:15:01,750 - backend.api.server - INFO - Response: 200 in 10993.93ms
+2025-07-17 18:15:01,760 - backend.api.server - INFO - Request: GET /manifest.json
+2025-07-17 18:15:01,763 - backend.api.server - INFO - Request: POST /api/search
+2025-07-17 18:15:01,782 - backend.api.server - INFO - Response: 404 in 25.78ms
+2025-07-17 18:15:01,917 - backend.ai_client - INFO - Calling AI Runner for query: 'what is machine learning'
+2025-07-17 18:15:21,083 - backend.ai_client - INFO - AI summary generated using google_gemini
+2025-07-17 18:15:21,086 - backend.api.routes - INFO - Search API: 'what is machine learning' -> 10 results in 19293.79ms
+2025-07-17 18:15:21,089 - backend.api.server - INFO - Response: 200 in 19325.5ms
+2025-07-17 18:15:21,094 - backend.api.server - INFO - Request: GET /api/health
+2025-07-17 18:15:21,094 - backend.api.server - INFO - Request: GET /api/stats
+2025-07-17 18:15:31,224 - backend.ai_client - ERROR - Failed to get AI stats: HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=5)
+2025-07-17 18:15:31,225 - backend.api.server - INFO - Response: 200 in 10131.49ms
+2025-07-17 18:15:31,226 - backend.api.server - INFO - Response: 200 in 10131.34ms

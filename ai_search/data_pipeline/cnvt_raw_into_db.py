@@ -13,6 +13,8 @@ import traceback
 import time
 import logging
 
+from language_detector import LanguageDetector  # Add language detection
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +29,7 @@ logging.basicConfig(
 MAX_WORKERS = multiprocessing.cpu_count()
 BATCH_SIZE = 50_000
 MAX_DOC_SIZE = 10_000_000
-MIN_CONTENT_LENGTH =    0
+MIN_CONTENT_LENGTH =    200
 BLOCKED_DOMAINS = {"adserver.com", "tracking.net", "analytics.pro"}
 MAX_QUEUE_SIZE = 100_000
 
@@ -163,6 +165,11 @@ def process_document(raw_doc: dict) -> Tuple[Optional[Document], Optional[str]]:
         
         if not html:
             skip_reason = "Missing content"
+            return None, skip_reason
+        
+        # 🌐 LANGUAGE DETECTION: Skip non-English content
+        if not LanguageDetector.is_english(html, url):
+            skip_reason = "Non-English content"
             return None, skip_reason
         
         # Handle large documents (truncate instead of skip)
@@ -341,7 +348,7 @@ def main(input_dir: Path, output_dir: Path):
     
     # Prepare output
     output_dir.mkdir(parents=True, exist_ok=True)
-    db_path = output_dir / "processed_documents.db"
+    db_path = output_dir / "documents.db"
     
     # Find all JSON files
     json_files = list(input_dir.glob("*.json"))

@@ -14,6 +14,8 @@ from datetime import datetime
 import sys
 from pathlib import Path
 import traceback
+from fastapi.encoders import jsonable_encoder
+
 
 # Add common utilities
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -155,12 +157,13 @@ def create_app() -> FastAPI:
         
         return JSONResponse(
             status_code=exc.status_code,
-            content=ErrorResponse(
+            content=jsonable_encoder(ErrorResponse(
                 message=exc.detail,
                 error_code=f"HTTP_{exc.status_code}",
                 details={"path": str(request.url.path)}
-            ).dict()
+            ).dict())
         )
+
     
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -169,12 +172,13 @@ def create_app() -> FastAPI:
         
         return JSONResponse(
             status_code=422,
-            content=ErrorResponse(
+            content=jsonable_encoder(ErrorResponse(
                 message="Request validation failed",
                 error_code="VALIDATION_ERROR",
                 details={"errors": exc.errors()}
-            ).dict()
+            ).dict())
         )
+
     
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
@@ -184,12 +188,13 @@ def create_app() -> FastAPI:
         
         return JSONResponse(
             status_code=500,
-            content=ErrorResponse(
+            content=jsonable_encoder(ErrorResponse(
                 message="Internal server error",
                 error_code="INTERNAL_ERROR",
                 details={"path": str(request.url.path)}
-            ).dict()
+            ).dict())
         )
+    
     
     # Startup event
     @app.on_event("startup")

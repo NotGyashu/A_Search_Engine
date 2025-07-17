@@ -53,10 +53,10 @@ TITLE_WEIGHT_MULTIPLIER = 2  # How many times title appears in index
 
 # AI Model Preferences (in order of priority)
 AI_MODEL_PREFERENCE = [
-    "smart_template",  # Default: no downloads required
     "openai_gpt",      # Cloud-based
     "ollama",          # Local models
-    "transformers"     # Hugging Face models
+    "transformers",    # Hugging Face models
+    "smart_template",  # Default: no downloads required
 ]
 
 # OpenAI Configuration
@@ -64,6 +64,8 @@ OPENAI_MODEL = "gpt-3.5-turbo"
 OPENAI_MAX_TOKENS = 150
 OPENAI_TEMPERATURE = 0.3
 OPENAI_TIMEOUT = 30
+AI_SUMMARY_MAX_LENGTH = 500  # ✅ <== THIS ONE IS MISSING
+AI_FALLBACK_ENABLED = True
 
 # Local Model Configuration
 LOCAL_SUMMARIZATION_MODEL = "facebook/bart-large-cnn"

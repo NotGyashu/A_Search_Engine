@@ -2,7 +2,8 @@
 build/
 bin/
 venv
-
+.env
+.env*
 # Data files
 data/raw/
 data/index/

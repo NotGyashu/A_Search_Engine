@@ -4,6 +4,7 @@
 
 #include "crawler_main.h"
 #include "ultra_parser.h"
+#include "language_detector.h"  // Add language detection
 #include "constants.h"
 #include <fstream>
 #include <atomic>
@@ -549,13 +550,19 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                                 crawl_logger->log_page(ctx->url, title, http_code, ctx->url_info.depth,
                                                      ctx->domain, ctx->response_data.size(), ctx->start_time);
                                 
-                                // Add to batch for file storage
-                                batch_buffer.emplace_back(ctx->url, ctx->response_data);
-                                
-                                // Save batch when it reaches optimal size
-                                if (batch_buffer.size() >= CrawlerConstants::Storage::BATCH_SIZE) {
-                                    file_storage->save_html_batch(batch_buffer);
-                                    batch_buffer.clear();  // ✅ Only clear after saving
+                                // 🌐 ZERO-COST LANGUAGE DETECTION: Filter non-English pages
+                                if (FastLanguageDetector::is_english_content(ctx->response_data, ctx->url)) {
+                                    // Add to batch for file storage (only English content)
+                                    batch_buffer.emplace_back(ctx->url, ctx->response_data);
+                                    
+                                    // Save batch when it reaches optimal size
+                                    if (batch_buffer.size() >= CrawlerConstants::Storage::BATCH_SIZE) {
+                                        file_storage->save_html_batch(batch_buffer);
+                                        batch_buffer.clear();  // ✅ Only clear after saving
+                                    }
+                                } else {
+                                    // Skip non-English content - don't store it
+                                    global_monitor.increment_filtered();
                                 }
                                                                 
                                 // PHASE 2: Pipeline HTML processing instead of blocking here
@@ -635,9 +642,21 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
         curl_multi_remove_handle(multi_handle, curl);
     }
     
-    // Save any remaining batch
+    // Save any remaining batch (filter for English content)
     if (!batch_buffer.empty()) {
-        file_storage->save_html_batch(batch_buffer);
+        // Filter English content from final batch
+        std::vector<std::pair<std::string, std::string>> english_batch;
+        for (const auto& [url, content] : batch_buffer) {
+            if (FastLanguageDetector::is_english_content(content, url)) {
+                english_batch.emplace_back(url, content);
+            } else {
+                global_monitor.increment_filtered();
+            }
+        }
+        
+        if (!english_batch.empty()) {
+            file_storage->save_html_batch(english_batch);
+        }
     }
     
     // Clean up shared handle and multi handle

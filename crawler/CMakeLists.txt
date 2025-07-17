@@ -97,6 +97,9 @@ set(MODULAR_SOURCES
     # Utilities
     src/utils.cpp
     
+    # Language Detection
+    src/language_detector.cpp
+    
     # Ultra-fast SIMD parser
     src/ultra_parser.cpp
 )
