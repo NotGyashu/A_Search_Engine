@@ -1,0 +1,15 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "cd ai_search/backend && python main.py"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[env]
+PORT = "8000"
+BACKEND_HOST = "0.0.0.0"
+DATABASE_PATH = "./data/processed/documents.db"
+AI_RUNNER_URL = "${{AI_RUNNER_URL}}"

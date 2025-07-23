@@ -54,6 +54,17 @@ def create_app() -> FastAPI:
     
     # Add request logging middleware
     @app.middleware("http")
+    async def websocket_cors_middleware(request: Request, call_next):
+        if "upgrade" in request.headers.get("connection", "").lower() and \
+        "websocket" in request.headers.get("upgrade", "").lower():
+            # Allow WebSocket connections from any origin
+            response = await call_next(request)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
+        return await call_next(request)
+
     async def log_requests(request: Request, call_next):
         start_time = time.time()
         

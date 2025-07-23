@@ -116,12 +116,13 @@ class DomainRanker:
     def __init__(self):
         # Merge all domain rankings for fast lookup
         self.all_domains = {**self.TIER_1_EDUCATIONAL, **self.TIER_2_EDUCATIONAL}
-        
+        print("DomainRanker initialized with precomputed domain scores.")
         # Precompile domain patterns for TLD matching
         self.tld_patterns = [(tld, score) for tld, score in self.EDUCATIONAL_TLDS.items()]
     
     def extract_domain(self, url: str) -> str:
         """Extract domain from URL with caching"""
+        print(f"Extracting domain from URL: ")
         if url in self._domain_cache:
             return self._domain_cache[url]
         
@@ -141,7 +142,7 @@ class DomainRanker:
     def get_domain_score(self, url: str) -> float:
         """Get domain authority score (zero-cost lookup)"""
         domain = self.extract_domain(url)
-        
+        print(f"Getting domain score for: ")
         # Direct domain lookup (fastest)
         if domain in self.all_domains:
             return self.all_domains[domain]
@@ -182,7 +183,7 @@ class DomainRanker:
         if any(term in query_text for term in ['example', 'sample', 'demo', 'code']):
             if self.DEFINITION_PATTERNS[3].search(text_to_analyze):
                 boost *= 1.2
-        
+        print(f"Content type boost calculated: {boost:.2f} for query terms: {query_terms}")
         return boost
     
     def calculate_domain_boost(self, url: str, title: str, content: str, query_terms: List[str] = None) -> float:
@@ -197,12 +198,13 @@ class DomainRanker:
         
         # Combined boost (capped at 3.0 to prevent extreme scores)
         total_boost = min(domain_score * content_boost, 3.0)
-        
+        print(f"Total domain boost calculated: {total_boost:.2f} for URL: {url}")
         return total_boost
     
     def is_educational_domain(self, url: str) -> bool:
         """Check if domain is educational (fast lookup)"""
         domain = self.extract_domain(url)
+        print(f"Domain educational?")
         
         # Check direct educational domains
         if domain in self.all_domains:
@@ -217,6 +219,9 @@ class DomainRanker:
     
     def get_domain_stats(self) -> Dict:
         """Get domain ranking statistics"""
+        print("Gathering domain ranking statistics...")
+         # Return counts of educational domains and TLDs
+         # This is a zero-cost operation since we use precomputed data
         return {
             'tier_1_domains': len(self.TIER_1_EDUCATIONAL),
             'tier_2_domains': len(self.TIER_2_EDUCATIONAL),

@@ -21,9 +21,11 @@ class AIClientService:
         self.ai_runner_url = ai_runner_url.rstrip('/')
         self.logger = Logger.setup_logger("backend.ai_client")
         self.timeout = 30  # 30 second timeout for AI operations
+        print(f"AI Client initialized with URL: ")
         
     def generate_summary(self, query: str, results: List[Dict], max_length: int = 300) -> Dict:
         """Generate AI summary by calling the AI Runner microservice"""
+        print(f"Generating AI summary for query: '' with  results in ai_search/backend/core/ai_client_service.py")
         if not results:
             return {
                 'summary': "No results found for your query.",
@@ -35,13 +37,20 @@ class AIClientService:
         start_time = time.time()
         
         try:
+           
             # Prepare request
             request_data = {
                 "query": query,
                 "results": results,
                 "max_length": max_length
             }
-            
+             # Add timeout to request
+            response = requests.post(
+                f"{self.ai_runner_url}/summarize",
+                json=request_data,
+                timeout=60,  # Increase timeout to 20 seconds
+                headers={"Content-Type": "application/json"}
+            )
             # Call AI Runner
             self.logger.info(f"Calling AI Runner for query: '{query}'")
             response = requests.post(
@@ -83,7 +92,7 @@ class AIClientService:
     def _fallback_summary(self, query: str, results: List[Dict], error: str, start_time: float) -> Dict:
         """Generate fallback summary when AI Runner is unavailable"""
         num_results = len(results)
-        
+        print(f"Fallback summary for query:  with  results in ai_search/backend/core/ai_client_service.py")
         if num_results == 1:
             summary = f"Found 1 relevant result for '{query}'."
         else:

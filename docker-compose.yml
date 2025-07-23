@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Frontend Service
+  frontend:
+    build:
+      context: .
+      dockerfile: ai_search/frontend/Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - search-network
+
+  # Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: ai_search/backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_PATH=/app/data/processed/documents.db
+      - AI_RUNNER_URL=http://ai-runner:8001
+      - BACKEND_HOST=0.0.0.0
+      - BACKEND_PORT=8000
+    volumes:
+      - search-data:/app/data
+    depends_on:
+      - ai-runner
+    networks:
+      - search-network
+    restart: unless-stopped
+
+  # AI Runner Service
+  ai-runner:
+    build:
+      context: .
+      dockerfile: ai_search/ai_runner/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - PORT=8001
+    networks:
+      - search-network
+    restart: unless-stopped
+
+  # Crawler Service (run manually or on schedule)
+  crawler:
+    build:
+      context: .
+      dockerfile: crawler/Dockerfile
+    volumes:
+      - search-data:/app/data
+      - ./RawHTMLdata:/app/raw_data:ro
+    networks:
+      - search-network
+    profiles:
+      - crawler
+    environment:
+      - MAX_PAGES=1000
+      - OUTPUT_DIR=/app/data
+
+# Named volumes for data persistence
+volumes:
+  search-data:
+    driver: local
+
+# Network for service communication
+networks:
+  search-network:
+    driver: bridge
+
+# Override for production
+# Create docker-compose.prod.yml for production settings
