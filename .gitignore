@@ -1,0 +1,61 @@
+# Build and binary directories
+build/
+bin/
+*.o
+*.so
+*.a
+
+# Virtual environments and Python environments
+venv/
+venv-ai*
+.env
+.env*
+
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data and crawl output
+data/
+data/raw/
+data/index/
+crawler/data/
+**/data/**
+**/Data/**
+*.json
+*.csv
+*.tsv
+*.parquet
+
+# Logs and temp files
+*.log
+*.tmp
+*.pid
+*.swp
+*.swo
+
+# Node and frontend dependencies (if you add React)
+node_modules/
+dist/
+
+# System and editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Git-specific
+
+# Output or temporary assets
+RawHTMLdata
+snapshots/
+crawl_output/
+
+# Backup and swap files
+*~
+*.bak
+
+# Jupyter notebooks (if used later)
+.ipynb_checkpoints
+data/backlog_urls.txt
+data/backlog_urls.txt
