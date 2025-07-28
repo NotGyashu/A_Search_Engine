@@ -156,6 +156,8 @@ namespace Paths {
     constexpr const char* RAW_DATA_PATH = "../../RawHTMLdata";
     constexpr const char* BLACKLIST_PATH = "../config/blacklist.txt";
     constexpr const char* SHARDED_DISK_PATH = "../data";
+    constexpr const char* CONFIG_PATH = "../config";         // Phase 2: Config files directory
+    constexpr const char* CACHE_PATH = "../config/cache";  // Phase 2: Cache files directory
 }
 
 // =============== HTTP STATUS CODES ===============

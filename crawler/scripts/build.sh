@@ -162,11 +162,7 @@ fi
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-# Create necessary data directories
-echo -e "${BLUE}Creating data directories...${NC}"
-mkdir -p "$SEARCH_ENGINE_ROOT/data/raw"
-mkdir -p "$SEARCH_ENGINE_ROOT/data/processed"
-mkdir -p "$SEARCH_ENGINE_ROOT/config"
+
 
 # Configure build
 echo -e "${BLUE}Configuring build ($BUILD_TYPE)...${NC}"
@@ -249,14 +245,5 @@ echo ""
 echo -e "${GREEN}Command line options:${NC}"
 echo -e "  ./crawler [max_threads] [max_depth] [max_queue_size]"
 echo -e "  Example: ./crawler 16 5 100000"
-echo ""
-echo -e "${GREEN}Configuration files:${NC}"
-echo -e "  - Config: $SEARCH_ENGINE_ROOT/crawler/config/crawler.conf"
-echo -e "  - Blacklist: $SEARCH_ENGINE_ROOT/crawler/config/blacklist.txt"
-echo ""
-echo -e "${GREEN}Output directories:${NC}"
-echo -e "  - Raw HTML: $SEARCH_ENGINE_ROOT/data/raw/"
-echo -e "  - Processed data: $SEARCH_ENGINE_ROOT/data/processed/"
-echo ""
 echo -e "${YELLOW}Note: Ensure you have sufficient disk space and network bandwidth${NC}"
 echo -e "${YELLOW}The crawler can generate significant traffic and data${NC}"
