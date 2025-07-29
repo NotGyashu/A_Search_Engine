@@ -19,6 +19,7 @@
 #include "http_client.h"       // Unified HTTP client
 #include "html_document.h"     // Standardized HTML parsing
 #include "connection_pool.h"   // Connection pooling
+#include "robots_txt_cache.h"
 
 // Modular utility includes
 #include "url_normalizer.h"
@@ -45,54 +46,17 @@
 #include <iomanip>
 #include <unordered_map>
 
+
+enum class RequestType {
+    PAGE,
+    ROBOTS_TXT
+};
+
 // Write callback for CURL
 size_t hybrid_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t total_size = size * nmemb;
     static_cast<std::string*>(userp)->append(static_cast<char*>(contents), total_size);
     return total_size;
-}
-
-// ✅ CONDITIONAL GET — Header callback for CURL to capture response headers
-size_t hybrid_header_callback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t total_size = size * nmemb;
-    static_cast<std::string*>(userp)->append(static_cast<char*>(contents), total_size);
-    return total_size;
-}
-
-// ✅ CONDITIONAL GET — Parse HTTP headers for ETag and Last-Modified
-ConditionalGet::HttpHeaders parse_response_headers(const std::string& headers_text) {
-    ConditionalGet::HttpHeaders headers;
-    headers.response_time = std::chrono::system_clock::now();
-    
-    std::istringstream stream(headers_text);
-    std::string line;
-    
-    while (std::getline(stream, line)) {
-        // Convert to lowercase for case-insensitive comparison
-        std::string line_lower = line;
-        std::transform(line_lower.begin(), line_lower.end(), line_lower.begin(), ::tolower);
-        
-        if (line_lower.find("etag:") == 0) {
-            size_t colon_pos = line.find(':');
-            if (colon_pos != std::string::npos && colon_pos + 1 < line.length()) {
-                headers.etag = line.substr(colon_pos + 1);
-                // Trim whitespace
-                headers.etag.erase(0, headers.etag.find_first_not_of(" \t\r\n"));
-                headers.etag.erase(headers.etag.find_last_not_of(" \t\r\n") + 1);
-            }
-        }
-        else if (line_lower.find("last-modified:") == 0) {
-            size_t colon_pos = line.find(':');
-            if (colon_pos != std::string::npos && colon_pos + 1 < line.length()) {
-                headers.last_modified = line.substr(colon_pos + 1);
-                // Trim whitespace
-                headers.last_modified.erase(0, headers.last_modified.find_first_not_of(" \t\r\n"));
-                headers.last_modified.erase(headers.last_modified.find_last_not_of(" \t\r\n") + 1);
-            }
-        }
-    }
-    
-    return headers;
 }
 
 // Global shutdown flag
@@ -166,107 +130,74 @@ public:
         return filtered_links;
     }
     
-    // Enhanced link processing with Phase 1: Simplified for performance
+    // *** FIX: Reverted to the robust and efficient legacy implementation ***
     static int process_and_enqueue_links(const std::vector<std::string>& links, 
                                        int current_depth, 
                                        const std::string& referring_domain,
                                        size_t worker_id) {
         int successfully_enqueued = 0;
+        std::vector<std::string> failed_urls; // Vector to batch URLs for disk queue
         
-        // Limit processing to prevent queue overflow
-        size_t max_links = std::min(links.size(), (size_t)50);
-        
-        for (size_t i = 0; i < max_links; ++i) {
-            const std::string& link = links[i];
+        // Process ALL discovered links, not just a subset.
+        for (const std::string& link : links) {
             float priority = ContentFilter::calculate_priority(link, current_depth + 1);
             UrlInfo new_url_info(link, priority, current_depth + 1, referring_domain);
             
-            // ✅ WORKSTEALING QUEUE — Enhanced queueing with fallback strategy
+            // 1. Try main smart frontier first
             if (smart_url_frontier->enqueue(new_url_info)) {
                 successfully_enqueued++;
-            } else if (work_stealing_queue->push_local(worker_id, new_url_info)) {
-                // ✅ Try work stealing queue if smart frontier is full
+            } 
+            // 2. If full, try the worker's local work-stealing queue
+            else if (work_stealing_queue->push_local(worker_id, new_url_info)) {
                 successfully_enqueued++;
-            } else {
-                // If both queues full, save to disk (but don't block)
-                std::vector<std::string> single_url = {link};
-                sharded_disk_queue->save_urls_to_disk(single_url);
             }
+            // 3. If both memory queues are full, add the URL to a batch for disk storage.
+            else {
+                failed_urls.push_back(link);
+            }
+        }
+        
+        // After processing all links, save the entire batch of failed URLs to disk in one operation.
+        if (!failed_urls.empty()) {
+            sharded_disk_queue->save_urls_to_disk(failed_urls);
         }
         
         return successfully_enqueued;
     }
 };
+
 struct MultiRequestContext {
     CURL* curl_handle;
     UrlInfo url_info;
     std::string url;
     std::string response_data;
-    std::string response_headers; // ✅ CONDITIONAL GET — Store response headers
+    std::string response_headers;
     std::string domain;
     std::chrono::steady_clock::time_point start_time;
-    struct curl_slist* request_headers; // Track request headers for cleanup
+    struct curl_slist* request_headers;
+    RequestType type = RequestType::PAGE;
+    int retries = 0;
     
-    MultiRequestContext(const UrlInfo& info, ConnectionPool* pool = nullptr) 
+    MultiRequestContext(const UrlInfo& info, ConnectionPool* pool) 
         : url_info(info), url(info.url), domain(UrlNormalizer::extract_domain(info.url))
         , start_time(std::chrono::steady_clock::now()), request_headers(nullptr) {
-        // Use domain-specific connection pooling if available
-        if (pool) {
-            curl_handle = pool->acquire_for_domain(domain);
-        } else {
-            curl_handle = curl_easy_init();
+        
+        curl_handle = pool->acquire_connection();
+        if (!curl_handle) {
+            curl_handle = curl_easy_init(); 
         }
-        response_data.reserve(1024 * 1024); // 1MB pre-allocation
-        response_headers.reserve(8192); // 8KB for headers
+        response_data.reserve(1024 * 1024);
+        response_headers.reserve(8192);
     }
     
     ~MultiRequestContext() {
         if (request_headers) {
-            curl_slist_free_all(request_headers); // ✅ CONDITIONAL GET — Free headers
+            curl_slist_free_all(request_headers);
         }
-        if (curl_handle) {
-            curl_easy_cleanup(curl_handle);
-        }
+        // Do not cleanup handle; it will be returned to the pool.
     }
 };
 
-/**
- * 🌐 DYNAMIC DOMAIN DISCOVERY MANAGER
- * Handles robots.txt fetching for newly discovered domains
- */
-class DynamicDomainManager {
-private:
-    std::unordered_set<std::string> discovered_domains_;
-    std::mutex domains_mutex_;
-    
-public:
-    bool is_new_domain(const std::string& domain) {
-        std::lock_guard<std::mutex> lock(domains_mutex_);
-        return discovered_domains_.find(domain) == discovered_domains_.end();
-    }
-    
-    void register_domain(const std::string& domain, RobotsTxtCache& robots) {
-        std::lock_guard<std::mutex> lock(domains_mutex_);
-        if (discovered_domains_.find(domain) == discovered_domains_.end()) {
-            discovered_domains_.insert(domain);
-            
-            // Asynchronously fetch robots.txt for new domains
-            std::thread([domain, &robots]() {
-                try {
-                    robots.fetch_and_cache(domain);
-                    // Robots.txt fetched silently for performance
-                } catch (...) {
-                    // Silently ignore robots.txt fetch failures
-                }
-            }).detach();
-        }
-    }
-    
-    size_t get_discovered_count() const {
-        std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(domains_mutex_));
-        return discovered_domains_.size();
-    }
-};
 
 // ✅ DOMAIN QUEUES — Shared global thread-safe domain queue manager
 class SharedDomainQueueManager {
@@ -314,17 +245,18 @@ public:
     }
 };
 
-// Global domain manager
-std::unique_ptr<DynamicDomainManager> domain_manager;
 
 // ✅ DOMAIN QUEUES — Global shared domain queue manager
 std::unique_ptr<SharedDomainQueueManager> shared_domain_queues;
 
+// Add new global store for deferred URLs
+std::unordered_map<std::string, std::vector<UrlInfo>> g_deferred_urls;
+std::mutex g_deferred_urls_mutex;
 /**
  * High-performance multi-interface crawler worker
  */
 void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& limiter,
-                         DomainBlacklist& blacklist, ErrorTracker& error_tracker) {
+                         DomainBlacklist& blacklist, ErrorTracker& error_tracker, ConnectionPool& connection_pool) {
     
     // Initialize connection pool for domain-specific connections
     ConnectionPool domain_connection_pool;
@@ -345,6 +277,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
     // Set up global DNS cache
     CURLSH* share_handle = curl_share_init();
     curl_share_setopt(share_handle, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+    curl_share_setopt(share_handle, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT); // Shares connection data
     
     // Active requests management
     std::unordered_map<CURL*, std::unique_ptr<MultiRequestContext>> active_requests;
@@ -435,20 +368,43 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                 continue;
             }
             
-            // Fast-path for trusted domains - skip robots.txt entirely for speed
-            bool is_trusted_domain = (domain.find("wikipedia.org") != std::string::npos ||
-                                    domain.find("github.com") != std::string::npos ||
-                                    domain.find("stackoverflow.com") != std::string::npos ||
-                                    domain.find("httpbin.org") != std::string::npos ||
-                                    domain.find("jsonplaceholder.typicode.com") != std::string::npos ||
-                                    domain.find("arxiv.org") != std::string::npos ||
-                                    domain.find("reddit.com") != std::string::npos);
             
-            // Check robots.txt compliance only for untrusted domains
-            if (!is_trusted_domain && !robots.is_allowed(domain, path)) {
-                urls_skipped_robots++;
-                continue;
+            RobotsCheckResult check_result = robots.is_allowed(domain, path);
+            switch (check_result) {
+                case RobotsCheckResult::ALLOWED:
+                    // Fall through to process the URL normally.
+                    break;
+                case RobotsCheckResult::DISALLOWED:
+                    urls_skipped_robots++;
+                    continue; // Skip this URL and get the next one.
+                case RobotsCheckResult::DEFERRED_FETCH_STARTED:
+                    {
+                        std::lock_guard<std::mutex> lock(g_deferred_urls_mutex);
+                        g_deferred_urls[domain].push_back(url_info);
+                    }
+                    
+                    std::string robots_url = "https://" + domain + "/robots.txt";
+                    UrlInfo robots_info(robots_url, 1.0f, 0, domain);
+
+                    auto ctx = std::make_unique<MultiRequestContext>(robots_info, &connection_pool);
+                    ctx->type = RequestType::ROBOTS_TXT;
+
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_URL, ctx->url.c_str());
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_WRITEFUNCTION, hybrid_write_callback);
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_WRITEDATA, &ctx->response_data);
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_TIMEOUT, CrawlerConstants::Network::TIMEOUT_SECONDS);
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_CONNECTTIMEOUT, CrawlerConstants::Network::CONNECT_TIMEOUT_SECONDS);
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_USERAGENT, CrawlerConstants::Headers::USER_AGENT);
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_SSL_VERIFYPEER, 0L); 
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
+                    curl_easy_setopt(ctx->curl_handle, CURLOPT_SHARE, share_handle);
+                    
+                    curl_multi_add_handle(multi_handle, ctx->curl_handle);
+                    active_requests[ctx->curl_handle] = std::move(ctx);
+                    continue; 
             }
+
             
             // ✅ DOMAIN QUEUES — Apply rate limiting with shared domain queues
             if (!limiter.can_request_now(domain)) {
@@ -472,7 +428,8 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
             }
             
             // Create request context - temporarily disable domain-specific connections
-            auto ctx = std::make_unique<MultiRequestContext>(url_info);
+            auto ctx = std::make_unique<MultiRequestContext>(url_info, &connection_pool);
+            ctx->type = RequestType::PAGE;
             successful_requests++;
             attempts = 0; // Reset attempts after successful request creation
             
@@ -497,7 +454,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
             curl_easy_setopt(ctx->curl_handle, CURLOPT_WRITEDATA, &ctx->response_data);
             
             // ✅ CONDITIONAL GET — Add header capture callback
-            curl_easy_setopt(ctx->curl_handle, CURLOPT_HEADERFUNCTION, hybrid_header_callback);
+            curl_easy_setopt(ctx->curl_handle, CURLOPT_HEADERFUNCTION, hybrid_write_callback);
             curl_easy_setopt(ctx->curl_handle, CURLOPT_HEADERDATA, &ctx->response_headers);
             
             // Phase 2: Set conditional headers if any
@@ -562,7 +519,33 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                 
                 if (it != active_requests.end()) {
                     auto& ctx = it->second;
+
+                if (ctx->type == RequestType::ROBOTS_TXT) {
+                    // This was a robots.txt download
+                    long http_code = 0;
+                    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+                    bool success = (msg->data.result == CURLE_OK && http_code == 200);
+
+                    // Update the cache with the result
+                    robots.update_cache(ctx->domain, ctx->response_data, success);
                     
+                    // Now, re-queue the URLs that were waiting for this file
+                    std::vector<UrlInfo> urls_to_requeue;
+                    {
+                        std::lock_guard<std::mutex> lock(g_deferred_urls_mutex);
+                        auto deferred_it = g_deferred_urls.find(ctx->domain);
+                        if (deferred_it != g_deferred_urls.end()) {
+                            urls_to_requeue = std::move(deferred_it->second);
+                            g_deferred_urls.erase(deferred_it);
+                        }
+                    }
+
+                    for (const auto& requeued_url : urls_to_requeue) {
+                        // Push back to the work-stealing queue for immediate processing
+                        work_stealing_queue->push_local(worker_id, requeued_url);
+                    }
+                } else {
+                    //Its a PAGE request
                     if (msg->data.result == CURLE_OK) {
                         long http_code = 0;
                         curl_off_t download_size = 0;
@@ -581,7 +564,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                             
                         } else if (http_code == CrawlerConstants::HttpStatus::OK && !ctx->response_data.empty()) {
                             // ✅ CONDITIONAL GET — Parse and cache response headers for future requests
-                            ConditionalGet::HttpHeaders new_headers = parse_response_headers(ctx->response_headers);
+                            ConditionalGet::HttpHeaders new_headers = ConditionalGet::ConditionalGetManager::parse_response_headers(ctx->response_headers);
                             conditional_get_manager->update_cache(ctx->url, new_headers);
                             
                             // Phase 1: Calculate content hash and update metadata
@@ -626,27 +609,22 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                                     );
                                     
                                     // Non-blocking enqueue - if queue is full, process synchronously
-                                    if (!html_processing_queue->enqueue(std::move(html_task))) {
-                                        // HTML queue full, process synchronously as fallback (simplified)
-                                        std::vector<std::string> links = AdaptiveLinkExtractor::extract_links_adaptive(
-                                            ctx->response_data, ctx->url);
-                                        
-                                        // Simplified link processing for performance
-                                        int new_links_added = 0;
-                                        for (const std::string& link : links) {
-                                            if (new_links_added >= 20) break; // Limit to prevent queue overflow
-                                            
-                                            float priority = ContentFilter::calculate_priority(link, ctx->url_info.depth + 1);
-                                            UrlInfo new_url_info(link, priority, ctx->url_info.depth + 1, ctx->domain);
-                                            
-                                            // Simplified queueing - just try smart queue
-                                            if (smart_url_frontier->enqueue(new_url_info)) {
-                                                new_links_added++;
-                                            }
-                                        }
-                                        
-                                        global_monitor.increment_links(new_links_added);
-                                    }
+                                    // Non-blocking enqueue - if queue is full, process synchronously as fallback
+                        if (!html_processing_queue->enqueue(std::move(html_task))) {
+                            
+                            // *** FIX: The fallback logic now correctly uses the full enqueue process ***
+                            // This ensures that if all memory queues are full, links will spill to the disk queue.
+                            
+                            std::cout << "⚠️  HTML queue full, processing links synchronously for " << ctx->url << std::endl;
+                            
+                            std::vector<std::string> links = AdaptiveLinkExtractor::extract_links_adaptive(
+                                ctx->response_data, ctx->url);
+                            
+                            int new_links_added = AdaptiveLinkExtractor::process_and_enqueue_links(
+                                links, ctx->url_info.depth, ctx->domain, worker_id);
+                            
+                            global_monitor.increment_links(new_links_added);
+                        }
                                 }
                             }
                         } else if (http_code == CrawlerConstants::HttpStatus::TOO_MANY_REQUESTS || 
@@ -657,22 +635,50 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                             crawl_logger->log_error(ctx->url, "HTTP " + std::to_string(http_code));
                         }
                     } else {
-                        // Handle cURL errors
-                        global_monitor.increment_errors();
-                        limiter.record_failure(ctx->domain);
-                        error_tracker.record_error(ctx->domain, msg->data.result);
-                        
-                        // Check if domain should be blacklisted
-                        if (error_tracker.should_blacklist_domain(ctx->domain)) {
-                            blacklist.add_temporary(ctx->domain);
-                            std::cout << "Worker " << worker_id << " blacklisted domain: " << ctx->domain << std::endl;
+                        bool is_ssl_error = (msg->data.result == CURLE_SSL_CONNECT_ERROR || 
+                                                 msg->data.result == CURLE_PEER_FAILED_VERIFICATION);
+                        if (is_ssl_error && ctx->retries == 0 && ctx->url.rfind("https://", 0) == 0) {
+                                
+                                std::cout << "ℹ️  HTTPS failed for " << ctx->domain << ", falling back to HTTP.\n";
+                                
+                                std::string http_url = "http://" + ctx->url.substr(8);
+                                UrlInfo fallback_info(http_url, ctx->url_info.priority, ctx->url_info.depth, ctx->url_info.referring_domain);
+                                
+                                auto fallback_ctx = std::make_unique<MultiRequestContext>(fallback_info, &connection_pool);
+                                fallback_ctx->retries = 1; // Mark as a retry to prevent loops
+
+                                // Configure and add the new handle
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_URL, fallback_ctx->url.c_str());
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_WRITEFUNCTION, hybrid_write_callback);
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_WRITEDATA, &fallback_ctx->response_data);
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_HEADERFUNCTION, hybrid_write_callback);
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_HEADERDATA, &fallback_ctx->response_headers);
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_TIMEOUT, CrawlerConstants::Network::TIMEOUT_SECONDS);
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_CONNECTTIMEOUT, CrawlerConstants::Network::CONNECT_TIMEOUT_SECONDS);
+                                curl_easy_setopt(fallback_ctx->curl_handle, CURLOPT_SHARE, share_handle);
+                                // Add other necessary options...
+
+                                curl_multi_add_handle(multi_handle, fallback_ctx->curl_handle);
+                                active_requests[fallback_ctx->curl_handle] = std::move(fallback_ctx);
+
+                            } else {
+                                // ORIGINAL ERROR HANDLING for non-fallback cases
+                                global_monitor.increment_errors();
+                                limiter.record_failure(ctx->domain);
+                                error_tracker.record_error(ctx->domain, msg->data.result);
+                                
+                                if (error_tracker.should_blacklist_domain(ctx->domain)) {
+                                    blacklist.add_temporary(ctx->domain);
+                                    std::cout << "Worker " << worker_id << " blacklisted domain: " << ctx->domain << std::endl;
+                                }
+                                crawl_logger->log_error(ctx->url, curl_easy_strerror(msg->data.result));
+                            }
                         }
-                        
-                        crawl_logger->log_error(ctx->url, curl_easy_strerror(msg->data.result));
-                    }
+                }
                     
                     // Remove from multi handle and cleanup
                     curl_multi_remove_handle(multi_handle, curl);
+                    connection_pool.release_connection(ctx->curl_handle); // Return handle to the pool
                     active_requests.erase(it);
                 }
             }
@@ -747,13 +753,6 @@ void html_processing_worker(int worker_id, RobotsTxtCache& robots) {
             std::vector<std::string> links = AdaptiveLinkExtractor::extract_links_adaptive(
                 task.html, task.url);
             
-            // Register new domains for robots.txt fetching
-            for (const std::string& link : links) {
-                std::string link_domain = UrlNormalizer::extract_domain(link);
-                if (domain_manager->is_new_domain(link_domain)) {
-                    domain_manager->register_domain(link_domain, robots);
-                }
-            }
             
             // Process and enqueue links with Phase 2 improvements
             int new_links_added = AdaptiveLinkExtractor::process_and_enqueue_links(
@@ -967,9 +966,39 @@ void enhanced_monitoring_thread() {
             }
         }
         
-        // 2. Periodic cleanup of empty disk shards
+        // 2. Periodic cleanup of empty disk shards and aggressive disk queue management
         if (elapsed_seconds % CrawlerConstants::Monitoring::CLEANUP_INTERVAL_SECONDS == 0) { // Every minute
             sharded_disk_queue->cleanup_empty_shards();
+        }
+        
+        // 🗃️ AGGRESSIVE DISK QUEUE USAGE - Move URLs to disk when memory queues are getting full
+        size_t smart_queue_capacity = 1000; // Assuming max queue size set to 1000
+        size_t work_stealing_capacity = work_stealing_queue->get_max_size();
+        
+        // Calculate memory usage percentages
+        double smart_usage = static_cast<double>(smart_queue_size) / smart_queue_capacity;
+        double work_usage = static_cast<double>(work_stealing_size) / work_stealing_capacity;
+        
+        // If memory queues are more than 80% full, aggressively move URLs to disk
+        if (smart_usage > 0.8 || work_usage > 0.8) {
+            std::vector<std::string> overflow_urls;
+            
+            // Try to extract URLs from work-stealing queue when it's getting full
+            if (work_usage > 0.8) {
+                for (size_t worker_id = 0; worker_id < 8 && overflow_urls.size() < 200; ++worker_id) {
+                    UrlInfo url_info("", 0.0f);
+                    if (work_stealing_queue->pop_local(worker_id, url_info)) {
+                        overflow_urls.push_back(url_info.url);
+                    }
+                }
+            }
+            
+            if (!overflow_urls.empty()) {
+                sharded_disk_queue->save_urls_to_disk(overflow_urls);
+                std::cout << "💾 AGGRESSIVE: Moved " << overflow_urls.size() 
+                         << " URLs to disk (Smart: " << std::fixed << std::setprecision(1) << (smart_usage * 100) 
+                         << "%, Work: " << (work_usage * 100) << "% full)\n";
+            }
         }
         
         // 2. Emergency seed injection when critically low - more aggressive
@@ -1062,6 +1091,8 @@ int main(int argc, char* argv[]) {
                               (int)std::thread::hardware_concurrency());
     int max_depth = CrawlerConstants::Queue::DEFAULT_MAX_DEPTH;
     int max_queue_size = CrawlerConstants::Queue::DEFAULT_MAX_QUEUE_SIZE;
+
+    
     
     if (argc > 1) max_threads = std::atoi(argv[1]);
     if (argc > 2) max_depth = std::atoi(argv[2]);
@@ -1070,6 +1101,10 @@ int main(int argc, char* argv[]) {
     // Phase 2: Calculate optimal worker distribution (simplified)
     int network_workers = max_threads;
     int html_workers = std::max(1, max_threads / 8); // Reduce HTML workers to prevent contention
+    ConnectionPool connection_pool(CrawlerConstants::Network::MAX_CONNECTIONS * network_workers);
+    HttpClient http_client(connection_pool);
+
+
     
     std::cout << "Configuration - Phase 1 & 2 Enhanced (Performance Optimized):\n";
     std::cout << "- Network workers: " << network_workers << "\n";
@@ -1097,12 +1132,20 @@ int main(int argc, char* argv[]) {
         CrawlerConstants::Paths::LOG_PATH
     );
     
-    // Phase 2: Initialize enhanced components
+    // Phase 2: Initialize enhanced components with size limits for proper disk queue usage
     sharded_disk_queue = std::make_unique<ShardedDiskQueue>(CrawlerConstants::Paths::SHARDED_DISK_PATH);
     html_processing_queue = std::make_unique<HtmlProcessingQueue>();
-    work_stealing_queue = std::make_unique<WorkStealingQueue>(network_workers);
-    domain_manager = std::make_unique<DynamicDomainManager>();
+    
+    // Initialize work-stealing queue with size limits to force disk queue usage
+    size_t work_queue_per_worker = 500; // Limit each worker to 500 URLs max
+    work_stealing_queue = std::make_unique<WorkStealingQueue>(network_workers, work_queue_per_worker);
+    
     shared_domain_queues = std::make_unique<SharedDomainQueueManager>(); // ✅ DOMAIN QUEUES
+    
+    std::cout << "📊 Queue Configuration:\n";
+    std::cout << "   Smart Queue: max " << max_queue_size << " URLs\n";
+    std::cout << "   Work Stealing: max " << work_stealing_queue->get_max_size() << " URLs (" << work_queue_per_worker << " per worker)\n";
+    std::cout << "   Disk Queue: unlimited (persistent storage)\n";
     
     // Initialize intelligent snippet extraction and domain configuration
     try {
@@ -1116,17 +1159,20 @@ int main(int argc, char* argv[]) {
     }
     
     // ✅ DIRECTORY CREATION — Ensure all paths exist before reading/writing
-    std::filesystem::create_directories(CrawlerConstants::Paths::CACHE_PATH);
     std::filesystem::create_directories(CrawlerConstants::Paths::CONFIG_PATH);
     std::filesystem::create_directories(std::filesystem::path(CrawlerConstants::Paths::LOG_PATH).parent_path());
     
     // Phase 2: Initialize RSS/Atom poller
-    conditional_get_manager = std::make_shared<ConditionalGet::ConditionalGetManager>();
-    conditional_get_manager->load_cache_from_file(std::string(CrawlerConstants::Paths::CACHE_PATH) + "/conditional_get_cache.txt");
+    try {
+        conditional_get_manager = std::make_shared<ConditionalGet::ConditionalGetManager>(
+            CrawlerConstants::Paths::ROCKSDB_CACHE_PATH
+        );
+    } catch (const std::exception& e) {
+        std::cerr << "FATAL ERROR during initialization: " << e.what() << std::endl;
+        return 1;
+    }
     
-    // Create ConnectionPool and HttpClient instances for unified HTTP operations
-    ConnectionPool connection_pool;
-    HttpClient http_client(connection_pool);
+
     
     rss_poller = std::make_unique<FeedPolling::RSSAtomPoller>([&](const std::vector<FeedPolling::FeedEntry>& entries) {
         if (!entries.empty() && smart_url_frontier && !stop_flag) {
@@ -1156,7 +1202,7 @@ int main(int argc, char* argv[]) {
     }, &http_client);
     
     // Initialize other components (robots.txt cache now requires HttpClient for compliance)
-    RobotsTxtCache robots(&http_client);
+    RobotsTxtCache robots;
     RateLimiter limiter;
     DomainBlacklist blacklist;
     ErrorTracker error_tracker;
@@ -1210,13 +1256,50 @@ int main(int argc, char* argv[]) {
             successfully_seeded_smart++;
         }
         
-        // Pre-fetch robots.txt for seed domains
-        std::string domain = UrlNormalizer::extract_domain(url);
-        robots.fetch_and_cache(domain);
     }
     
     std::cout << "✅ Seeded hybrid crawler with " << successfully_seeded_smart << "/" << seed_urls.size() << " URLs\n";
     std::cout << "   Smart frontier: " << successfully_seeded_smart << " URLs\n";
+    
+    // 🗃️ DISK QUEUE TEST - Force some URLs to disk queue to verify functionality
+    std::vector<std::string> disk_test_urls = {
+        "https://httpbin.org/html",
+        "https://httpbin.org/json", 
+        "https://httpbin.org/xml",
+        "https://en.wikipedia.org/wiki/Computer_science",
+        "https://stackoverflow.com/questions/tagged/performance"
+    };
+    
+    // Test 1: Direct disk queue population
+    if (!disk_test_urls.empty()) {
+        sharded_disk_queue->save_urls_to_disk(disk_test_urls);
+        std::cout << "💾 DISK QUEUE TEST: Added " << disk_test_urls.size() << " test URLs directly to disk queue\n";
+    }
+    
+    // Test 2: Overflow smart queue to force disk usage (if queue size is small)
+    if (max_queue_size <= 100) {
+        std::vector<std::string> overflow_test_urls;
+        for (int i = 0; i < 50; ++i) {
+            overflow_test_urls.push_back("https://httpbin.org/status/" + std::to_string(200 + i));
+        }
+        
+        int overflow_added = 0;
+        for (const auto& url : overflow_test_urls) {
+            UrlInfo url_info(url, 0.5f, 0);
+            if (!smart_url_frontier->enqueue(url_info)) {
+                // Smart queue is full, this should trigger disk storage
+                break;
+            }
+            overflow_added++;
+        }
+        
+        if (overflow_added < overflow_test_urls.size()) {
+            std::vector<std::string> remaining_urls(overflow_test_urls.begin() + overflow_added, overflow_test_urls.end());
+            sharded_disk_queue->save_urls_to_disk(remaining_urls);
+            std::cout << "💾 OVERFLOW TEST: Smart queue full after " << overflow_added 
+                     << " URLs, saved remaining " << remaining_urls.size() << " to disk\n";
+        }
+    }
     
     // Check initial queue status after seeding
     size_t post_seed_smart_size = smart_url_frontier->size();
@@ -1255,14 +1338,12 @@ int main(int argc, char* argv[]) {
     sitemap_parser->start_parsing();
     std::cout << "   Sitemap parser started\n";
     
-    std::cout << "   Conditional GET cache loaded (" << conditional_get_manager->get_cache_size() << " entries)\n";
+    conditional_get_manager->print_cache_stats();
     
     // Start network workers
     for (int i = 0; i < network_workers; ++i) {
-        network_workers_threads.emplace_back([i, &robots, &limiter, &blacklist, &error_tracker]() {
-            multi_crawler_worker(i, std::ref(robots), std::ref(limiter),
-                                std::ref(blacklist), std::ref(error_tracker));
-        });
+         network_workers_threads.emplace_back(multi_crawler_worker, i, std::ref(robots), std::ref(limiter),
+                               std::ref(blacklist), std::ref(error_tracker), std::ref(connection_pool));
     }
     
     // Start HTML processing workers
@@ -1348,8 +1429,6 @@ int main(int argc, char* argv[]) {
     crawl_logger->flush();
     enhanced_storage->flush();
     
-    // Phase 2: Save conditional GET cache
-    conditional_get_manager->save_cache_to_file(std::string(CrawlerConstants::Paths::CACHE_PATH) + "/conditional_get_cache.txt");
     
     // Phase 2: Print final statistics
     rss_poller->print_feed_stats();
@@ -1363,7 +1442,6 @@ int main(int argc, char* argv[]) {
     sharded_disk_queue.reset();
     html_processing_queue.reset();
     work_stealing_queue.reset();
-    domain_manager.reset();
     shared_domain_queues.reset(); // ✅ DOMAIN QUEUES cleanup
     
     curl_global_cleanup();

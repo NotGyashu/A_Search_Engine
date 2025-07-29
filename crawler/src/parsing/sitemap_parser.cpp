@@ -193,7 +193,7 @@ void SitemapParser::parser_worker() {
             std::lock_guard<std::mutex> lock(sitemaps_mutex_);
             for (auto& sitemap : sitemaps_) {
                 if (sitemap.is_ready_for_parse()) {
-                    std::cout << "Parsing sitemap: " << sitemap.sitemap_url << std::endl;
+                    // std::cout << "Parsing sitemap: " << sitemap.sitemap_url << std::endl;
                     
                     std::string content = download_sitemap(sitemap.sitemap_url);
                     if (!content.empty()) {
@@ -217,7 +217,7 @@ for (const auto& child_url : child_sitemaps) {
         SitemapInfo child_sitemap(child_url);
         child_sitemap.parse_interval_hours = sitemap.parse_interval_hours;
         new_child_sitemaps.push_back(child_sitemap);
-        std::cout << "Prepared child sitemap: " << child_url << std::endl;
+        // std::cout << "Prepared child sitemap: " << child_url << std::endl;
     }
 }
 
@@ -245,7 +245,7 @@ sitemaps_.insert(sitemaps_.end(), new_child_sitemaps.begin(), new_child_sitemaps
                         }
                         
                         sitemap.record_success();
-                        std::cout << "Parsed sitemap successfully, found " << new_urls.size() << " new/updated URLs" << std::endl;
+                        // std::cout << "Parsed sitemap successfully, found " << new_urls.size() << " new/updated URLs" << std::endl;
                     } else {
                         sitemap.record_failure();
                         std::cout << "Failed to download sitemap: " << sitemap.sitemap_url << std::endl;
@@ -299,24 +299,28 @@ std::string SitemapParser::download_sitemap(const std::string& sitemap_url) {
     try {
         auto response = http_client_->download_sitemap(sitemap_url);
         
+        // *** IMPROVED ERROR CHECKING AND LOGGING ***
+        
+        // Check for cURL-level errors first (e.g., connection timed out)
         if (!response.success) {
-            std::cerr << "Failed to download sitemap " << sitemap_url << ": " 
+            std::cerr << "Failed to download sitemap " << sitemap_url << " (cURL Error): " 
                       << HttpClient::curl_error_string(response.curl_code) << std::endl;
             return "";
         }
         
+        // Check for HTTP-level errors (e.g., 404 Not Found, 403 Forbidden)
         if (response.headers.status_code != 200) {
-            std::cerr << "HTTP error " << response.headers.status_code 
-                      << " downloading sitemap: " << sitemap_url << std::endl;
+            std::cerr << "Failed to download sitemap " << sitemap_url 
+                      << " (HTTP Status: " << response.headers.status_code << ")" << std::endl;
             return "";
         }
         
-        std::cout << "Successfully downloaded sitemap: " << sitemap_url 
-                  << " (" << response.body.size() << " bytes)" << std::endl;
+        // std::cout << "✅ Successfully downloaded sitemap: " << sitemap_url 
+        //           << " (" << response.body.size() << " bytes)" << std::endl;
         return response.body;
         
     } catch (const std::exception& e) {
-        std::cerr << "Exception downloading sitemap " << sitemap_url << ": " << e.what() << std::endl;
+        std::cerr << "Exception during sitemap download for " << sitemap_url << ": " << e.what() << std::endl;
         return "";
     }
 }

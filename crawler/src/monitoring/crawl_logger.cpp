@@ -5,11 +5,12 @@
 CrawlLogger::CrawlLogger(const std::string& db_path, const std::string& csv_path) 
     : db_(nullptr), db_path_(db_path), csv_path_(csv_path) {
     
-    // Create directories if they don't exist
-    std::filesystem::create_directories(std::filesystem::path(db_path).parent_path());
-    std::filesystem::create_directories(std::filesystem::path(csv_path).parent_path());
+    if (!initialize()) {
+        // If initialization fails, we cannot log, so this is a critical error.
+        throw std::runtime_error("Failed to initialize CrawlLogger. Check file paths and permissions for '" + db_path + "' and '" + csv_path + "'.");
+    }
     
-    // Start logger thread
+    // Start logger thread only after successful initialization
     logger_thread_ = std::thread(&CrawlLogger::logger_worker, this);
 }
 
@@ -31,9 +32,17 @@ CrawlLogger::~CrawlLogger() {
 }
 
 bool CrawlLogger::initialize() {
+    // Create directories if they don't exist
+    try {
+        std::filesystem::create_directories(std::filesystem::path(db_path_).parent_path());
+        std::filesystem::create_directories(std::filesystem::path(csv_path_).parent_path());
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Error creating logger directories: " << e.what() << std::endl;
+        return false;
+    }
+
     // Initialize SQLite database
-    int rc = sqlite3_open(db_path_.c_str(), &db_);
-    if (rc != SQLITE_OK) {
+    if (sqlite3_open(db_path_.c_str(), &db_) != SQLITE_OK) {
         std::cerr << "Cannot open database: " << sqlite3_errmsg(db_) << std::endl;
         return false;
     }
@@ -42,7 +51,7 @@ bool CrawlLogger::initialize() {
     const char* sql = R"(
         CREATE TABLE IF NOT EXISTS crawl_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT NOT NULL,
+            url TEXT NOT NULL UNIQUE,
             title TEXT,
             status_code INTEGER,
             depth INTEGER,
@@ -54,9 +63,8 @@ bool CrawlLogger::initialize() {
     )";
     
     char* err_msg = nullptr;
-    rc = sqlite3_exec(db_, sql, nullptr, nullptr, &err_msg);
-    if (rc != SQLITE_OK) {
-        std::cerr << "SQL error: " << err_msg << std::endl;
+    if (sqlite3_exec(db_, sql, nullptr, nullptr, &err_msg) != SQLITE_OK) {
+        std::cerr << "SQL error creating table: " << err_msg << std::endl;
         sqlite3_free(err_msg);
         return false;
     }
@@ -112,6 +120,8 @@ void CrawlLogger::log_error(const std::string& url, const std::string& error_mes
 }
 
 void CrawlLogger::flush() {
+    // This function ensures any buffered data is written to the file.
+    std::lock_guard<std::mutex> csv_lock(csv_mutex_);
     if (csv_log_.is_open()) {
         csv_log_.flush();
     }
@@ -125,31 +135,48 @@ void CrawlLogger::logger_worker() {
         while (!log_queue_.empty()) {
             LogEntry entry = std::move(log_queue_.front());
             log_queue_.pop();
-            lock.unlock();
+            lock.unlock(); // Release lock while writing to disk
             
+            // Get current time for logging
+            auto now_sys = std::chrono::system_clock::now();
+            auto time_t = std::chrono::system_clock::to_time_t(now_sys);
+
             // Process the log entry
             if (entry.is_error) {
-                // Log error to CSV
                 std::lock_guard<std::mutex> csv_lock(csv_mutex_);
                 if (csv_log_.is_open()) {
-                    auto now = std::chrono::system_clock::now();
-                    auto time_t = std::chrono::system_clock::to_time_t(now);
-                    csv_log_ << time_t << "," << entry.url << ",ERROR,0,0,,0," << entry.error_message << "\n";
+                    csv_log_ << time_t << ",\"" << entry.url << "\",ERROR,0,0,," << ",\"" << entry.error_message << "\"\n";
                 }
             } else {
-                // Log page to database and CSV
-                // Simplified implementation - can be enhanced
-                std::lock_guard<std::mutex> csv_lock(csv_mutex_);
-                if (csv_log_.is_open()) {
-                    auto time_t = std::chrono::system_clock::to_time_t(
-                        std::chrono::system_clock::now());
-                    csv_log_ << time_t << "," << entry.url << "," << entry.title << "," 
-                             << entry.status_code << "," << entry.depth << "," << entry.domain 
-                             << "," << entry.content_size << ",\n";
+                // Log page to CSV
+                {
+                    std::lock_guard<std::mutex> csv_lock(csv_mutex_);
+                    if (csv_log_.is_open()) {
+                        csv_log_ << time_t << ",\"" << entry.url << "\",\"" << entry.title << "\"," 
+                                 << entry.status_code << "," << entry.depth << ",\"" << entry.domain 
+                                 << "\"," << entry.content_size << ",\n";
+                    }
+                }
+                // Log page to database
+                {
+                    std::lock_guard<std::mutex> db_lock(db_mutex_);
+                    const char* sql = "INSERT OR IGNORE INTO crawl_log (url, title, status_code, depth, domain, content_size, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?);";
+                    sqlite3_stmt* stmt;
+                    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+                        sqlite3_bind_text(stmt, 1, entry.url.c_str(), -1, SQLITE_STATIC);
+                        sqlite3_bind_text(stmt, 2, entry.title.c_str(), -1, SQLITE_STATIC);
+                        sqlite3_bind_int(stmt, 3, entry.status_code);
+                        sqlite3_bind_int(stmt, 4, entry.depth);
+                        sqlite3_bind_text(stmt, 5, entry.domain.c_str(), -1, SQLITE_STATIC);
+                        sqlite3_bind_int64(stmt, 6, entry.content_size);
+                        sqlite3_bind_int64(stmt, 7, time_t);
+                        sqlite3_step(stmt);
+                        sqlite3_finalize(stmt);
+                    }
                 }
             }
             
-            lock.lock();
+            lock.lock(); // Re-acquire lock for the loop condition
         }
     }
 }

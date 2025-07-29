@@ -1,211 +1,108 @@
 #include "conditional_get.h"
-#include "http_client.h"
-#include "connection_pool.h"
 #include <iostream>
-#include <fstream>
 #include <sstream>
+#include <vector>
+#include <memory>
 #include <algorithm>
 #include <cctype>
 
 namespace ConditionalGet {
 
-bool ConditionalGetManager::should_download(const std::string& url) {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    auto it = url_cache_.find(url);
-    
-    if (it == url_cache_.end()) {
-        return true; // No cache info, should download
+ConditionalGetManager::ConditionalGetManager(const std::string& db_path) {
+    rocksdb::Options options;
+    options.create_if_missing = true;
+    options.IncreaseParallelism();
+    options.OptimizeLevelStyleCompaction();
+
+    rocksdb::DB* db_ptr;
+    rocksdb::Status status = rocksdb::DB::Open(options, db_path, &db_ptr);
+
+    if (!status.ok()) {
+        throw std::runtime_error("Could not initialize ConditionalGetManager DB: " + status.ToString());
     }
-    
-    const auto& headers = it->second;
-    
-    // If we have cache info, we can try conditional GET
-    return headers.has_cache_info();
+    db_.reset(db_ptr);
+    std::cout << "✅ ConditionalGetManager initialized with RocksDB at: " << db_path << std::endl;
 }
 
-ConditionalGetManager::ConditionalGetResult ConditionalGetManager::conditional_get(const std::string& url) {
-    ConditionalGetResult result;
-    
-    // Get cached headers
-    HttpHeaders cached_headers;
-    {
-        std::lock_guard<std::mutex> lock(cache_mutex_);
-        auto it = url_cache_.find(url);
-        if (it != url_cache_.end()) {
-            cached_headers = it->second;
-        }
+ConditionalGetManager::~ConditionalGetManager() {
+    std::cout << "✅ ConditionalGetManager RocksDB instance shut down." << std::endl;
+}
+
+std::string ConditionalGetManager::serialize_headers(const HttpHeaders& headers) const {
+    auto time_t = std::chrono::system_clock::to_time_t(headers.response_time);
+    return headers.etag + "|" + headers.last_modified + "|" + std::to_string(time_t);
+}
+
+HttpHeaders ConditionalGetManager::deserialize_headers(const std::string& data) const {
+    HttpHeaders headers;
+    std::stringstream ss(data);
+    std::string part;
+    std::vector<std::string> parts;
+    while (std::getline(ss, part, '|')) {
+        parts.push_back(part);
     }
-    
-    try {
-        // Create a temporary connection pool for this request
-        ConnectionPool pool;
-        HttpClient client(pool);
-        HttpClient::HttpResponse response;
-        
-        if (cached_headers.has_cache_info()) {
-            // Build conditional headers using RequestOptions
-            HttpClient::RequestOptions options;
-            
-            if (!cached_headers.etag.empty()) {
-                options.if_none_match = cached_headers.etag;
-            }
-            
-            if (!cached_headers.last_modified.empty()) {
-                options.if_modified_since = cached_headers.last_modified;
-            }
-            
-            // Perform conditional GET request
-            response = client.get(url, options);
-            
-            // Check if content was not modified
-            if (response.not_modified) {
-                result.content_changed = false;
-                result.http_status = 304;
-                result.headers = cached_headers;
-                std::cout << "Conditional GET: Content not modified for " << url << std::endl;
-                return result;
-            }
-        } else {
-            // No cache info, perform regular GET
-            response = client.get(url);
-        }
-        
-        // Parse response headers - convert HttpClient::HttpHeaders to our HttpHeaders
-        result.headers.etag = response.headers.etag;
-        result.headers.last_modified = response.headers.last_modified;
-        result.headers.response_time = std::chrono::system_clock::now();
-        
-        result.content = response.body;
-        result.content_changed = true;
-        result.http_status = response.headers.status_code;
-        
-        // Update cache
-        update_cache(url, result.headers);
-        
-        std::cout << "Conditional GET: Content downloaded for " << url 
-                  << " (status: " << result.http_status << ")" << std::endl;
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Error in conditional GET for " << url << ": " << e.what() << std::endl;
-        result.content_changed = true; // Assume changed on error
-        result.http_status = 0;
+    if (parts.size() >= 3) {
+        headers.etag = parts[0];
+        headers.last_modified = parts[1];
+        try {
+            headers.response_time = std::chrono::system_clock::from_time_t(std::stoll(parts[2]));
+        } catch (...) { /* ignore */ }
     }
-    
-    return result;
+    return headers;
 }
 
 void ConditionalGetManager::update_cache(const std::string& url, const HttpHeaders& headers) {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    url_cache_[url] = headers;
+    db_->Put(rocksdb::WriteOptions(), url, serialize_headers(headers));
 }
 
 HttpHeaders ConditionalGetManager::get_cache_info(const std::string& url) {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    auto it = url_cache_.find(url);
-    if (it != url_cache_.end()) {
-        return it->second;
+    std::string value;
+    rocksdb::Status status = db_->Get(rocksdb::ReadOptions(), url, &value);
+    if (status.ok()) {
+        return deserialize_headers(value);
     }
     return HttpHeaders();
 }
 
 void ConditionalGetManager::clear_cache(const std::string& url) {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    url_cache_.erase(url);
-}
-
-size_t ConditionalGetManager::get_cache_size() const {
-    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(cache_mutex_));
-    return url_cache_.size();
+    db_->Delete(rocksdb::WriteOptions(), url);
 }
 
 void ConditionalGetManager::print_cache_stats() const {
-    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(cache_mutex_));
-    std::cout << "\n=== Conditional GET Cache Statistics ===" << std::endl;
-    std::cout << "Cached URLs: " << url_cache_.size() << std::endl;
-    
-    int etag_count = 0;
-    int lastmod_count = 0;
-    
-    for (const auto& pair : url_cache_) {
-        if (!pair.second.etag.empty()) etag_count++;
-        if (!pair.second.last_modified.empty()) lastmod_count++;
-    }
-    
-    std::cout << "URLs with ETag: " << etag_count << std::endl;
-    std::cout << "URLs with Last-Modified: " << lastmod_count << std::endl;
-    std::cout << "========================================\n" << std::endl;
+    std::string num_keys;
+    db_->GetProperty("rocksdb.estimate-num-keys", &num_keys);
+    std::cout << "\n=== Conditional GET Cache Statistics (RocksDB) ===" << std::endl;
+    std::cout << "Estimated Cached URLs: " << num_keys << std::endl;
+    std::cout << "==================================================\n" << std::endl;
 }
 
-bool ConditionalGetManager::save_cache_to_file(const std::string& cache_file_path) {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    
-    std::ofstream file(cache_file_path);
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open cache file for writing: " << cache_file_path << std::endl;
-        return false;
-    }
-    
-    // Simple format: URL|ETag|Last-Modified|ResponseTime
-    for (const auto& pair : url_cache_) {
-        const auto& url = pair.first;
-        const auto& headers = pair.second;
-        
-        auto time_t = std::chrono::system_clock::to_time_t(headers.response_time);
-        
-        file << url << "|" 
-             << headers.etag << "|" 
-             << headers.last_modified << "|" 
-             << time_t << std::endl;
-    }
-    
-    std::cout << "Saved " << url_cache_.size() << " cache entries to " << cache_file_path << std::endl;
-    return true;
-}
-
-bool ConditionalGetManager::load_cache_from_file(const std::string& cache_file_path) {
-    std::ifstream file(cache_file_path);
-    if (!file.is_open()) {
-        std::cout << "No existing cache file found: " << cache_file_path << std::endl;
-        return false;
-    }
-    
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    url_cache_.clear();
-    
+// *** Implementation of the static header parsing function moved here. ***
+HttpHeaders ConditionalGetManager::parse_response_headers(const std::string& headers_text) {
+    HttpHeaders headers;
+    std::istringstream stream(headers_text);
     std::string line;
-    int loaded_count = 0;
     
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
+    while (std::getline(stream, line)) {
+        std::string line_lower = line;
+        std::transform(line_lower.begin(), line_lower.end(), line_lower.begin(), ::tolower);
         
-        // Parse: URL|ETag|Last-Modified|ResponseTime
-        std::vector<std::string> parts;
-        std::stringstream ss(line);
-        std::string part;
-        
-        while (std::getline(ss, part, '|')) {
-            parts.push_back(part);
-        }
-        
-        if (parts.size() >= 4) {
-            HttpHeaders headers;
-            headers.etag = parts[1];
-            headers.last_modified = parts[2];
-            
-            try {
-                std::time_t time_t = std::stoll(parts[3]);
-                headers.response_time = std::chrono::system_clock::from_time_t(time_t);
-            } catch (...) {
-                headers.response_time = std::chrono::system_clock::now();
+        if (line_lower.rfind("etag:", 0) == 0) {
+            size_t colon_pos = line.find(':');
+            if (colon_pos != std::string::npos) {
+                headers.etag = line.substr(colon_pos + 1);
+                headers.etag.erase(0, headers.etag.find_first_not_of(" \t\r\n"));
+                headers.etag.erase(headers.etag.find_last_not_of(" \t\r\n") + 1);
             }
-            
-            url_cache_[parts[0]] = headers;
-            loaded_count++;
+        } else if (line_lower.rfind("last-modified:", 0) == 0) {
+            size_t colon_pos = line.find(':');
+            if (colon_pos != std::string::npos) {
+                headers.last_modified = line.substr(colon_pos + 1);
+                headers.last_modified.erase(0, headers.last_modified.find_first_not_of(" \t\r\n"));
+                headers.last_modified.erase(headers.last_modified.find_last_not_of(" \t\r\n") + 1);
+            }
         }
     }
-    
-    std::cout << "Loaded " << loaded_count << " cache entries from " << cache_file_path << std::endl;
-    return true;
+    return headers;
 }
 
 } // namespace ConditionalGet

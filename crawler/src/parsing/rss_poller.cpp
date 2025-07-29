@@ -198,8 +198,8 @@ std::string RSSAtomPoller::download_feed(const std::string& feed_url) {
             return "";
         }
         
-        std::cout << "Successfully downloaded feed: " << feed_url 
-                  << " (" << response.body.size() << " bytes)" << std::endl;
+        // std::cout << "Successfully downloaded feed: " << feed_url 
+        //           << " (" << response.body.size() << " bytes)" << std::endl;
         return response.body;
         
     } catch (const std::exception& e) {

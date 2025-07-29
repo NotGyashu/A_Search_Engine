@@ -212,21 +212,27 @@ HttpClient::HttpResponse HttpClient::get(const std::string& url, const RequestOp
             domain = url.substr(start, end == std::string::npos ? url.length() : end);
         }
         
-        curl = connection_pool_.acquire_for_domain(domain);
+        curl = connection_pool_.acquire_connection();
         if (!curl) {
             response.curl_code = CURLE_FAILED_INIT;
+            response.success = false;
             return response;
         }
         
         configure_request(curl, url, options, &response.body, &response.headers);
         
         response.curl_code = curl_easy_perform(curl);
-        response.success = (response.curl_code == CURLE_OK);
-        
-        if (response.success) {
-            // Check for 304 Not Modified
+        // It must be returned AFTER all info is gathered from the handle.
+        if (response.curl_code == CURLE_OK) {
+            response.success = true;
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            response.headers.status_code = static_cast<int>(http_code);
+
             response.not_modified = (response.headers.status_code == 304);
             response.success = (response.headers.status_code >= 200 && response.headers.status_code < 400);
+        } else {
+             response.success = false;
         }
         
     } catch (const std::exception& e) {

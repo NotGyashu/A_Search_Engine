@@ -1,26 +1,22 @@
 #include "connection_pool.h"
 #include <iostream>
 
-// Thread-local cache definitions
-thread_local std::vector<CURL*> ConnectionPool::thread_local_cache_;
-thread_local size_t ConnectionPool::cache_size_ = 0;
-
-ConnectionPool::ConnectionPool() {
-    // Initialize connection pool
-    for (size_t i = 0; i < max_connections_; ++i) {
+ConnectionPool::ConnectionPool(size_t max_connections) : max_connections_(max_connections) {
+    // Pre-populate the pool with a reasonable number of connections
+    size_t initial_size = std::min((size_t)10, max_connections_);
+    for (size_t i = 0; i < initial_size; ++i) {
         CURL* curl = create_connection();
         if (curl) {
-            connections_.emplace_back(curl, std::chrono::steady_clock::now(), false);
+            connections_queue_.enqueue(curl);
+            total_connections_++;
         }
     }
 }
 
 ConnectionPool::~ConnectionPool() {
-    // Cleanup all connections
-    for (auto& conn : connections_) {
-        if (conn.handle) {
-            curl_easy_cleanup(conn.handle);
-        }
+    CURL* curl_handle;
+    while (connections_queue_.try_dequeue(curl_handle)) {
+        curl_easy_cleanup(curl_handle);
     }
 }
 
@@ -33,78 +29,36 @@ CURL* ConnectionPool::create_connection() {
 }
 
 void ConnectionPool::configure_connection(CURL* curl) {
+    // Basic configuration applied to all handles in the pool
     if (!curl) return;
-    
-    // Basic configuration
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "MiniSearchEngine/1.0");
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    // Timeouts and other settings will be applied per-request by the worker
 }
 
 CURL* ConnectionPool::acquire_connection() {
-    // Try thread-local cache first
-    if (cache_size_ > 0) {
-        CURL* curl = thread_local_cache_[--cache_size_];
+    CURL* curl = nullptr;
+    // Try to get a connection from the queue first
+    if (connections_queue_.try_dequeue(curl)) {
         return curl;
     }
     
-    // Find available connection from pool
-    for (auto& conn : connections_) {
-        bool expected = false;
-        if (conn.in_use.compare_exchange_weak(expected, true)) {
-            conn.last_used = std::chrono::steady_clock::now();
-            return conn.handle;
-        }
+    // If the queue is empty, create a new connection if we're under the max limit
+    if (total_connections_.load() < max_connections_) {
+        total_connections_++;
+        return create_connection();
     }
     
-    // Create new connection if none available
-    return create_connection();
-}
-
-CURL* ConnectionPool::acquire_for_domain(const std::string& domain) {
-    // For now, just use regular acquire
-    return acquire_connection();
+    // Pool is empty and we've hit the connection limit
+    return nullptr;
 }
 
 void ConnectionPool::release_connection(CURL* curl) {
     if (!curl) return;
-    
-    // Try to store in thread-local cache
-    if (cache_size_ < MAX_THREAD_CACHE) {
-        thread_local_cache_.resize(MAX_THREAD_CACHE);
-        thread_local_cache_[cache_size_++] = curl;
-        return;
-    }
-    
-    // Return to pool
-    for (auto& conn : connections_) {
-        if (conn.handle == curl) {
-            conn.in_use.store(false);
-            return;
-        }
-    }
-    
-    // Cleanup if not from pool
-    curl_easy_cleanup(curl);
-}
-
-void ConnectionPool::cleanup_idle_connections() {
-    auto now = std::chrono::steady_clock::now();
-    const auto timeout = std::chrono::minutes(5);
-    
-    // Simple cleanup logic - can be enhanced
+    curl_easy_reset(curl); // Reset the handle for reuse
+    connections_queue_.enqueue(curl);
 }
 
 size_t ConnectionPool::active_connections() const {
-    size_t active = 0;
-    for (const auto& conn : connections_) {
-        if (conn.in_use.load()) {
-            active++;
-        }
-    }
-    return active;
+    return total_connections_.load() - connections_queue_.size_approx();
 }

@@ -40,6 +40,8 @@ private:
     std::atomic<bool> shutdown_{false};
     
     void logger_worker();
+    // *** FIX: Made initialize() private as it should only be called by the constructor ***
+    bool initialize();
 
 public:
     CrawlLogger(const std::string& db_path, const std::string& csv_path);
@@ -50,5 +52,4 @@ public:
                   const std::chrono::steady_clock::time_point& timestamp);
     void log_error(const std::string& url, const std::string& error_message);
     void flush();
-    bool initialize();
 };

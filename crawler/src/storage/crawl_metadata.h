@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
+#include <array>
 
 /**
  * Phase 1: Smart Crawl Scheduling
@@ -93,38 +94,59 @@ struct UrlMetadata {
     }
 };
 
-// Thread-safe metadata store
+/**
+ * Thread-safe metadata store using a sharded map to eliminate lock contention.
+ */
 class CrawlMetadataStore {
 private:
-    std::unordered_map<std::string, std::unique_ptr<UrlMetadata>> metadata_map_;
-    mutable std::mutex metadata_mutex_;
-    
+    // Define the number of shards. A power of 2 is optimal.
+    static constexpr size_t NUM_METADATA_SHARDS = 256;
+
+    // A single shard containing a map and its dedicated mutex.
+    struct MetadataShard {
+        std::unordered_map<std::string, std::unique_ptr<UrlMetadata>> metadata_map_;
+        mutable std::mutex mutex_;
+    };
+
+    // The main data store is now an array of shards.
+    std::array<MetadataShard, NUM_METADATA_SHARDS> shards_;
+
+    // Helper function to get the correct shard for a given URL.
+    MetadataShard& get_shard(const std::string& url) const {
+        // Use the default std::hash for fast, non-cryptographic hashing.
+        static std::hash<std::string> hasher;
+        // The const_cast is necessary because the function is const but we need to return
+        // a non-const reference to the array element for locking.
+        return const_cast<MetadataShard&>(shards_[hasher(url) % NUM_METADATA_SHARDS]);
+    }
+
 public:
-    // Get or create metadata for URL
+    // Get or create metadata for URL. Locks only one shard.
     UrlMetadata* get_or_create_metadata(const std::string& url) {
-        std::lock_guard<std::mutex> lock(metadata_mutex_);
+        auto& shard = get_shard(url);
+        std::lock_guard<std::mutex> lock(shard.mutex_);
         
-        auto it = metadata_map_.find(url);
-        if (it == metadata_map_.end()) {
-            metadata_map_[url] = std::make_unique<UrlMetadata>();
-            return metadata_map_[url].get();
+        auto it = shard.metadata_map_.find(url);
+        if (it == shard.metadata_map_.end()) {
+            shard.metadata_map_[url] = std::make_unique<UrlMetadata>();
+            return shard.metadata_map_[url].get();
         }
         return it->second.get();
     }
     
-    // Update metadata after crawling
+    // Update metadata after crawling. Locks only one shard.
     void update_after_crawl(const std::string& url, const std::string& new_content_hash) {
-        std::lock_guard<std::mutex> lock(metadata_mutex_);
+        auto& shard = get_shard(url);
+        std::lock_guard<std::mutex> lock(shard.mutex_);
         
-        auto it = metadata_map_.find(url);
-        if (it == metadata_map_.end()) {
-            // Create new metadata
+        auto it = shard.metadata_map_.find(url);
+        if (it == shard.metadata_map_.end()) {
             auto metadata = std::make_unique<UrlMetadata>();
             metadata->content_hash = new_content_hash;
             metadata->last_crawl_time = std::chrono::system_clock::now();
             metadata->crawl_count = 1;
             metadata->update_next_crawl_time();
-            metadata_map_[url] = std::move(metadata);
+            shard.metadata_map_[url] = std::move(metadata);
         } else {
             auto& metadata = it->second;
             bool content_changed = (metadata->content_hash != new_content_hash);
@@ -141,46 +163,46 @@ public:
         }
     }
     
-    // Get ready URLs for crawling (sorted by priority)
-    std::vector<std::string> get_ready_urls(size_t max_count = 1000) const {
-        std::lock_guard<std::mutex> lock(metadata_mutex_);
-        
-        std::vector<std::pair<std::string, float>> ready_urls;
-        
-        for (const auto& [url, metadata] : metadata_map_) {
-            if (metadata->is_ready_for_crawl()) {
-                ready_urls.emplace_back(url, metadata->calculate_priority());
+    // Get ready URLs for crawling. Iterates through shards, locking them one by one.
+    // NOTE: This version does not globally sort by priority, as that is the job
+    // of the SmartUrlFrontier. It efficiently collects a batch of work to do.
+    std::vector<std::string> get_ready_urls(size_t max_count = 10000) const {
+        std::vector<std::string> result;
+        result.reserve(max_count);
+
+        for (const auto& shard : shards_) {
+            if (result.size() >= max_count) break;
+
+            std::lock_guard<std::mutex> lock(shard.mutex_);
+            for (const auto& [url, metadata] : shard.metadata_map_) {
+                if (metadata->is_ready_for_crawl()) {
+                    result.push_back(url);
+                    if (result.size() >= max_count) break;
+                }
             }
         }
-        
-        // Sort by priority (highest first)
-        std::sort(ready_urls.begin(), ready_urls.end(),
-                 [](const auto& a, const auto& b) { return a.second > b.second; });
-        
-        std::vector<std::string> result;
-        size_t count = std::min(max_count, ready_urls.size());
-        result.reserve(count);
-        
-        for (size_t i = 0; i < count; ++i) {
-            result.push_back(ready_urls[i].first);
-        }
-        
         return result;
     }
     
-    // Statistics
+    // Get total size. Iterates through shards, locking them one by one.
     size_t size() const {
-        std::lock_guard<std::mutex> lock(metadata_mutex_);
-        return metadata_map_.size();
+        size_t total_size = 0;
+        for (const auto& shard : shards_) {
+            std::lock_guard<std::mutex> lock(shard.mutex_);
+            total_size += shard.metadata_map_.size();
+        }
+        return total_size;
     }
     
+    // Count ready URLs. Iterates through shards, locking them one by one.
     size_t count_ready_urls() const {
-        std::lock_guard<std::mutex> lock(metadata_mutex_);
-        
         size_t count = 0;
-        for (const auto& [url, metadata] : metadata_map_) {
-            if (metadata->is_ready_for_crawl()) {
-                count++;
+        for (const auto& shard : shards_) {
+            std::lock_guard<std::mutex> lock(shard.mutex_);
+            for (const auto& [url, metadata] : shard.metadata_map_) {
+                if (metadata->is_ready_for_crawl()) {
+                    count++;
+                }
             }
         }
         return count;
