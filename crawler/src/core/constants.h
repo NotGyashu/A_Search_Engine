@@ -23,7 +23,8 @@ namespace Workers {
 // =============== QUEUE CONFIGURATION ===============
 namespace Queue {
     constexpr int DEFAULT_MAX_DEPTH = 4;                // Default crawl depth
-    constexpr int DEFAULT_MAX_QUEUE_SIZE = 500000;      // Default main queue size
+    constexpr int DEFAULT_MAX_QUEUE_SIZE = 50000;      // Default main queue size
+    constexpr int DEFAULT_WORK_STEALING_QUEUE_SIZE = 50000;      // Default work stealing queue size
     constexpr int MAX_CONCURRENT_REQUESTS = 45;         // Max concurrent requests per worker
     constexpr int MAX_QUEUE_DRAIN_ATTEMPTS = 100;       // Max attempts to drain queue
     constexpr int DISK_LOAD_BATCH_SIZE = 1000;           // URLs loaded from disk per batch
@@ -154,8 +155,13 @@ namespace Paths {
     constexpr const char* DB_PATH = "../data/processed/hybrid_crawl_metadata.db";
     constexpr const char* LOG_PATH = "../data/processed/hybrid_crawl_log.csv";
     constexpr const char* RAW_DATA_PATH = "../../RawHTMLdata";
-    constexpr const char* BLACKLIST_PATH = "../config/blacklist.txt";
-    constexpr const char* SHARDED_DISK_PATH = "../data";
+    constexpr const char* BLACKLIST_PATH = "../data/blacklist.txt";
+    constexpr const char* SHARDED_DISK_PATH = "../data/sharded";
+    constexpr const char* CONFIG_PATH = "../config";
+    constexpr const char* CONDITIONAL_GET_CACHE_PATH = "../cache/rocksdb_conditional_get_cache";
+    constexpr const char* ROBOTS_TXT_CACHE_PATH = "../cache/rocksdb_robots_txt_cache";
+    constexpr const char* ROCKSDB_RATE_LIMITER_PATH = "../cache/rocksdb_rate_limiter_cache";
+    constexpr const char* ROCKSDB_METADATA_PATH = "../cache/rocksdb_metadata_store";
 }
 
 // =============== HTTP STATUS CODES ===============
