@@ -173,6 +173,8 @@ struct MultiRequestContext {
     std::string response_data;
     std::string response_headers;
     std::string domain;
+
+
     std::chrono::steady_clock::time_point start_time;
     struct curl_slist* request_headers;
     RequestType type = RequestType::PAGE;
@@ -203,13 +205,21 @@ struct MultiRequestContext {
 class SharedDomainQueueManager {
 private:
     std::unordered_map<std::string, std::queue<UrlInfo>> domain_queues_;
-    mutable std::unordered_map<std::string, std::mutex> domain_mutexes_;
-    mutable std::mutex manager_mutex_; // For managing domain_mutexes map
-    
+    // FIX: Store unique_ptr to mutexes, as std::mutex is not movable.
+    mutable std::unordered_map<std::string, std::unique_ptr<std::mutex>> domain_mutexes_;
+    mutable std::mutex manager_mutex_; 
+
 public:
     bool try_queue_for_domain(const std::string& domain, const UrlInfo& url_info) {
         std::lock_guard<std::mutex> manager_lock(manager_mutex_);
-        std::lock_guard<std::mutex> domain_lock(domain_mutexes_[domain]);
+        
+        // FIX: Check for mutex existence and create it if it's new.
+        if (domain_mutexes_.find(domain) == domain_mutexes_.end()) {
+            domain_mutexes_[domain] = std::make_unique<std::mutex>();
+        }
+        
+        // FIX: Lock the pointed-to mutex object.
+        std::lock_guard<std::mutex> domain_lock(*(domain_mutexes_[domain]));
         
         if (domain_queues_[domain].size() < CrawlerConstants::Queue::DOMAIN_QUEUE_LIMIT) {
             domain_queues_[domain].push(url_info);
@@ -218,20 +228,22 @@ public:
         return false;
     }
     
-    bool try_dequeue_from_available_domain(RateLimiter& limiter, UrlInfo& url_info, std::string& domain) {
+    bool try_dequeue_from_available_domain(RateLimiter& limiter, UrlInfo& url_info, std::string& out_domain) {
         std::lock_guard<std::mutex> manager_lock(manager_mutex_);
         
-        for (auto& [d, queue] : domain_queues_) {
-            if (!queue.empty() && limiter.can_request_now(d)) {
-                std::lock_guard<std::mutex> domain_lock(domain_mutexes_[d]);
-                if (!queue.empty()) { // Double-check after acquiring domain lock
+        for (auto& [domain, queue] : domain_queues_) {
+            if (!queue.empty() && limiter.can_request_now(domain)) {
+                // FIX: Lock the pointed-to mutex object.
+                std::lock_guard<std::mutex> domain_lock(*(domain_mutexes_[domain]));
+                if (!queue.empty()) {
                     url_info = queue.front();
                     queue.pop();
-                    domain = d;
+                    out_domain = domain;
                     return true;
                 }
             }
         }
+      
         return false;
     }
     
@@ -326,9 +338,15 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
             
             // ✅ WORKSTEALING QUEUE — Integrated queue access strategy
             bool found_url = false;
+            std::string domain;
             
-            // 1. Try smart priority queue first (Phase 1)
-            if (smart_url_frontier->dequeue(url_info)) {
+            
+            // 1. (HIGHEST PRIORITY) Try to get a URL from a domain that is ready to be crawled.
+            if (shared_domain_queues->try_dequeue_from_available_domain(limiter, url_info, domain)) {
+                found_url = true;
+            }
+            // 2. (FALLBACK) If no ready domain-specific URLs, get from the main high-level queues.
+            else if (smart_url_frontier->dequeue(url_info)) {
                 found_url = true;
             }
             // 2. ✅ Try work stealing queue as secondary priority
@@ -359,7 +377,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
             
             urls_dequeued++;
             
-            std::string domain = UrlNormalizer::extract_domain(url_info.url);
+            domain = UrlNormalizer::extract_domain(url_info.url);
             std::string path = UrlNormalizer::extract_path(url_info.url);
             
             // Skip blacklisted domains
@@ -524,10 +542,10 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                     // This was a robots.txt download
                     long http_code = 0;
                     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-                    bool success = (msg->data.result == CURLE_OK && http_code == 200);
+                    // bool success = (msg->data.result == CURLE_OK && http_code == 200);
 
                     // Update the cache with the result
-                    robots.update_cache(ctx->domain, ctx->response_data, success);
+                   robots.update_cache(ctx->domain, ctx->response_data, static_cast<int>(http_code));
                     
                     // Now, re-queue the URLs that were waiting for this file
                     std::vector<UrlInfo> urls_to_requeue;
@@ -629,8 +647,8 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                             }
                         } else if (http_code == CrawlerConstants::HttpStatus::TOO_MANY_REQUESTS || 
                                   http_code == CrawlerConstants::HttpStatus::SERVICE_UNAVAILABLE) {
-                            // Handle rate limiting from server
-                            limiter.throttle_domain(ctx->domain, CrawlerConstants::Network::THROTTLE_DURATION_SECONDS);
+                            std::cout << "⏳ Server busy (" << http_code << "): " << ctx->url << ". Applying backoff.\n";
+                    metadata_store->record_temporary_failure(ctx->url);
                         } else if (http_code >= CrawlerConstants::HttpStatus::BAD_REQUEST) {
                             crawl_logger->log_error(ctx->url, "HTTP " + std::to_string(http_code));
                         }
@@ -897,11 +915,20 @@ void enhanced_monitoring_thread() {
         
         auto now = std::chrono::steady_clock::now();
         auto elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(now - monitoring_start).count();
-        
+
+        // If a pointer is null during shutdown, we treat its size as 0.
+        // This prevents the race condition and the subsequent crash.
+        if (!smart_url_frontier || !sharded_disk_queue || !work_stealing_queue || !html_processing_queue) {
+            // One of the core components has been destroyed, so we should exit.
+            break;
+        }
+
         size_t smart_queue_size = smart_url_frontier->size();
         size_t disk_queue_size = sharded_disk_queue->get_total_disk_queue_size();
         size_t work_stealing_size = work_stealing_queue->total_size();
         size_t html_queue_size = html_processing_queue->size();
+        
+        // Calculate current crawl rate
         double current_rate = global_monitor.get_crawl_rate();
         size_t total_processed = global_monitor.get_total_pages();
         
@@ -950,6 +977,7 @@ void enhanced_monitoring_thread() {
         
         // 1. Refill from sharded disk when smart queue gets low
         if (smart_queue_size < CrawlerConstants::Queue::REFILL_THRESHOLD && disk_queue_size > 0) {
+            if (sharded_disk_queue) {
             auto loaded_urls = sharded_disk_queue->load_urls_from_disk(CrawlerConstants::Queue::REFILL_THRESHOLD);
             int refilled = 0;
             
@@ -964,6 +992,7 @@ void enhanced_monitoring_thread() {
             if (refilled > 0) {
                 std::cout << "✅ Loaded " << refilled << " URLs from sharded disk (Smart queue was " << smart_queue_size << ")\n";
             }
+        }
         }
         
         // 2. Periodic cleanup of empty disk shards and aggressive disk queue management
@@ -1118,7 +1147,9 @@ int main(int argc, char* argv[]) {
     // Initialize Phase 2 global components
     
     // Phase 1: Initialize smart crawl scheduling components
-    metadata_store = std::make_shared<CrawlScheduling::CrawlMetadataStore>();
+    metadata_store = std::make_shared<CrawlScheduling::CrawlMetadataStore>(
+        CrawlerConstants::Paths::ROCKSDB_METADATA_PATH
+    );
     smart_url_frontier = std::make_unique<CrawlScheduling::SmartUrlFrontier>(metadata_store);
     smart_url_frontier->set_max_depth(max_depth);
     smart_url_frontier->set_max_queue_size(max_queue_size);
@@ -1165,7 +1196,7 @@ int main(int argc, char* argv[]) {
     // Phase 2: Initialize RSS/Atom poller
     try {
         conditional_get_manager = std::make_shared<ConditionalGet::ConditionalGetManager>(
-            CrawlerConstants::Paths::ROCKSDB_CACHE_PATH
+            CrawlerConstants::Paths::CONDITIONAL_GET_CACHE_PATH
         );
     } catch (const std::exception& e) {
         std::cerr << "FATAL ERROR during initialization: " << e.what() << std::endl;
@@ -1202,8 +1233,8 @@ int main(int argc, char* argv[]) {
     }, &http_client);
     
     // Initialize other components (robots.txt cache now requires HttpClient for compliance)
-    RobotsTxtCache robots;
-    RateLimiter limiter;
+    RobotsTxtCache robots(CrawlerConstants::Paths::ROBOTS_TXT_CACHE_PATH);
+    RateLimiter limiter(CrawlerConstants::Paths::ROCKSDB_RATE_LIMITER_PATH);
     DomainBlacklist blacklist;
     ErrorTracker error_tracker;
     
@@ -1282,8 +1313,8 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < 50; ++i) {
             overflow_test_urls.push_back("https://httpbin.org/status/" + std::to_string(200 + i));
         }
-        
-        int overflow_added = 0;
+
+        size_t overflow_added = 0;
         for (const auto& url : overflow_test_urls) {
             UrlInfo url_info(url, 0.5f, 0);
             if (!smart_url_frontier->enqueue(url_info)) {

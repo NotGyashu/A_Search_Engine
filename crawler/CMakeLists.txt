@@ -116,6 +116,7 @@ set(SOURCES
     src/monitoring/performance_monitor.cpp
     src/monitoring/crawl_logger.cpp
     src/monitoring/error_tracker.cpp
+     src/storage/crawl_metadata.cpp
     
     # Utility functions
     src/utils/url_normalizer.cpp

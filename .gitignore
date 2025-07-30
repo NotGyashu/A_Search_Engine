@@ -59,3 +59,8 @@ crawl_output/
 .ipynb_checkpoints
 data/backlog_urls.txt
 data/backlog_urls.txt
+
+
+#cache files
+/crawler/cache/
+

@@ -158,7 +158,10 @@ namespace Paths {
     constexpr const char* BLACKLIST_PATH = "../data/blacklist.txt";
     constexpr const char* SHARDED_DISK_PATH = "../data/sharded";
     constexpr const char* CONFIG_PATH = "../config";
-    constexpr const char* ROCKSDB_CACHE_PATH = "../cache/rocksdb_conditional_get_cache";
+    constexpr const char* CONDITIONAL_GET_CACHE_PATH = "../cache/rocksdb_conditional_get_cache";
+    constexpr const char* ROBOTS_TXT_CACHE_PATH = "../cache/rocksdb_robots_txt_cache";
+    constexpr const char* ROCKSDB_RATE_LIMITER_PATH = "../cache/rocksdb_rate_limiter_cache";
+    constexpr const char* ROCKSDB_METADATA_PATH = "../cache/rocksdb_metadata_store";
 }
 
 // =============== HTTP STATUS CODES ===============
