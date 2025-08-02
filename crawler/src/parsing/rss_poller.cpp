@@ -108,6 +108,12 @@ void RSSAtomPoller::stop() {
     std::cout << "RSS/Atom poller stopped gracefully" << std::endl;
 }
 
+void RSSAtomPoller::set_poll_interval(int seconds) {
+    poll_interval_ = std::chrono::seconds(seconds);
+    std::cout << "✅ RSS Poller interval set to " << seconds << " seconds for fresh mode." << std::endl;
+}
+
+
 void RSSAtomPoller::poller_worker() {
     while (!shutdown_) {
         try {
@@ -127,16 +133,28 @@ void RSSAtomPoller::poller_worker() {
                                 entries = parse_atom_feed(content);
                             }
                             
-                            // Filter for recent entries
+                            // Filter for recent entries and count per feed
+                            int recent_count_this_feed = 0;
+                            int filtered_count_this_feed = 0;
                             for (const auto& entry : entries) {
-                                if (is_recent_entry(entry.pub_date)) {
+                                // For fresh mode, use a more lenient time threshold (48 hours instead of 24)
+                                bool is_recent = is_recent_entry(entry.pub_date, 48);
+                                if (is_recent) {
                                     new_entries.push_back(entry);
+                                    recent_count_this_feed++;
+                                } else {
+                                    filtered_count_this_feed++;
                                 }
+                            }
+                            
+                            if (filtered_count_this_feed > 0) {
+                                std::cout << "🕒 Filtered out " << filtered_count_this_feed 
+                                         << " older entries (>48h)" << std::endl;
                             }
                             
                             feed.record_success();
                             std::cout << "Found " << entries.size() << " entries in feed, " 
-                                      << new_entries.size() << " are recent" << std::endl;
+                                      << recent_count_this_feed << " are recent" << std::endl;
                         } else {
                             feed.record_failure();
                             std::cout << "Failed to download feed: " << feed.feed_url << std::endl;
@@ -147,19 +165,23 @@ void RSSAtomPoller::poller_worker() {
             
             // Forward new URLs to crawler
             if (!new_entries.empty() && url_callback_) {
+                std::cout << "📡 RSS Poller: Forwarding " << new_entries.size() 
+                         << " total recent URLs to crawler callback..." << std::endl;
                 try {
                     url_callback_(new_entries);
+                    std::cout << "✅ RSS Poller: Successfully called callback with " 
+                             << new_entries.size() << " URLs" << std::endl;
                 } catch (const std::exception& e) {
-                    std::cerr << "Error in RSS callback: " << e.what() << std::endl;
+                    std::cerr << "❌ Error in RSS callback: " << e.what() << std::endl;
                 } catch (...) {
-                    std::cerr << "Unknown error in RSS callback" << std::endl;
+                    std::cerr << "❌ Unknown error in RSS callback" << std::endl;
                 }
             }
             
-            // Sleep for 30 seconds before next check, but wake up immediately on shutdown
+            // Sleep for the configured interval, but wake up immediately on shutdown
             std::unique_lock<std::mutex> lock(shutdown_mutex_);
-            if (!shutdown_cv_.wait_for(lock, std::chrono::seconds(30), [this] { return shutdown_.load(); })) {
-                // Timeout occurred (30 seconds passed), continue with next iteration
+            if (!shutdown_cv_.wait_for(lock, poll_interval_, [this] { return shutdown_.load(); })) {
+                // Timeout occurred, continue with next iteration
             }
             // If shutdown flag is set, the loop will exit on next iteration
             

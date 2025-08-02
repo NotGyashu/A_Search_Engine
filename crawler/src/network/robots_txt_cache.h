@@ -5,6 +5,7 @@
 #include <mutex>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include "rocksdb/db.h"
 
 // The result of a non-blocking check against robots.txt rules.
@@ -21,6 +22,7 @@ private:
         std::chrono::steady_clock::time_point timestamp;
         bool is_valid = false;
         int last_http_status = 0; // Store the last HTTP status for re-fetch logic
+        int crawl_delay = 0; // Crawl-delay in seconds
     };
     
     mutable std::mutex mutex_;
@@ -35,6 +37,10 @@ private:
     // Helper methods for serialization to/from RocksDB
     std::string serialize(const RobotsInfo& info) const;
     RobotsInfo deserialize(const std::string& value) const;
+
+    // Helper method for parsing rules
+    bool parse_rules(const std::string& content, const std::string& user_agent, 
+                     std::vector<std::string>& allowed, std::vector<std::string>& disallowed) const;
 
 public:
     explicit RobotsTxtCache(const std::string& db_path);

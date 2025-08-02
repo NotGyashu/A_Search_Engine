@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <thread>
 
 RateLimiter::RateLimiter(const std::string& db_path) {
     rocksdb::Options options;
@@ -81,7 +82,7 @@ void RateLimiter::wait_for_domain(const std::string& domain) {
     
     int64_t required_gap = now - last;
     if (required_gap < delay_ns) {
-        nano_pause(delay_ns - required_gap);
+        std::this_thread::sleep_for(std::chrono::nanoseconds(delay_ns - required_gap));
         now = std::chrono::system_clock::now().time_since_epoch().count();
     }
     

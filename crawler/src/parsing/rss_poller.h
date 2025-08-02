@@ -86,6 +86,7 @@ private:
     // Condition variable for graceful shutdown
     std::condition_variable shutdown_cv_;
     std::mutex shutdown_mutex_;
+    std::chrono::seconds poll_interval_{30};
     
     // For forwarding discovered URLs to the crawler
     std::function<void(const std::vector<FeedEntry>&)> url_callback_;
@@ -121,6 +122,9 @@ public:
     // Get statistics
     size_t get_active_feeds_count() const;
     void print_feed_stats() const;
+
+    // New method to configure polling interval for fresh mode
+    void set_poll_interval(int seconds);
 };
 
 } // namespace FeedPolling

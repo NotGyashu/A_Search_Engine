@@ -10,6 +10,7 @@
 #include <chrono>
 #include <iostream>
 #include <iomanip>
+#include "tracy/Tracy.hpp"
 
 namespace UltraParser {
 
@@ -506,41 +507,40 @@ std::string UltraLinkExtractor::resolve_url(std::string_view relative_url) const
 // ============= ULTRA PARSER FACADE IMPLEMENTATION =============
 
 std::vector<std::string> UltraHTMLParser::extract_links_ultra(const std::string& html, const std::string& base_url) {
+    ZoneScopedN("UltraParser - extract_links_ultra"); // Parent zone for the whole function
+
     auto start_time = std::chrono::high_resolution_clock::now();
     
-    // Get thread-local extractor
     if (!t_extractor_) {
         t_extractor_ = new UltraLinkExtractor(base_url);
     } else {
-        // Update base URL if changed
         t_extractor_->set_base_url(base_url);
     }
     
-    // Stage 1: SIMD Prefilter - HTML detection
-    if (!prefilter_.is_html_content(html.data(), html.length())) {
-        g_simd_filtered.fetch_add(1); // Count as filtered (not HTML)
-        return {}; // Not HTML content
+    // INSTRUMENTED: Profile each stage of the parser
+    {
+        ZoneScopedN("UltraParser - Prefilter Quality Check");
+        if (!prefilter_.is_html_content(html.data(), html.length()) || !prefilter_.is_quality_content(html.data(), html.length())) {
+            g_simd_filtered.fetch_add(1);
+            return {};
+        }
     }
     
-    // Stage 1: SIMD Quality Filter - Comprehensive quality check
-    if (!prefilter_.is_quality_content(html.data(), html.length())) {
-        g_simd_filtered.fetch_add(1); // Count as filtered (low quality)
-        return {}; // Low quality page filtered out
+    std::string_view filtered_view;
+    {
+        ZoneScopedN("UltraParser - Prefilter Noise Filter");
+        if (t_filter_buffer_.size() < html.length()) {
+            t_filter_buffer_.resize(html.length() * 2);
+        }
+        filtered_view = prefilter_.filter_noise(html.data(), html.length(), t_filter_buffer_.data());
     }
     
-    // Prepare filter buffer if needed
-    if (t_filter_buffer_.size() < html.length()) {
-        t_filter_buffer_.resize(html.length() * 2);
+    std::vector<std::string> links;
+    {
+        ZoneScopedN("UltraParser - Streaming Extraction");
+        links = t_extractor_->extract_links(filtered_view.data(), filtered_view.length());
     }
     
-    // Filter noise (Stage 1 continued)
-    std::string_view filtered = prefilter_.filter_noise(html.data(), html.length(), 
-                                                       t_filter_buffer_.data());
-    
-    // Stage 2 & 3: Streaming tokenization + targeted extraction
-    std::vector<std::string> links = t_extractor_->extract_links(filtered.data(), filtered.length());
-    
-    // Update performance counters
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
     

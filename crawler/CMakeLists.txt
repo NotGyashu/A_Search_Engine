@@ -4,23 +4,26 @@ project(mini_search_engine_crawler)
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Add include directory for configuration headers
+add_compile_options(-Wno-stringop-overflow)
 include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/tracy/public)
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -rdynamic")
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -rdynamic")
 
 # Aggressive optimization flags for maximum performance (Phase 1 Ultra)
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -mtune=native -flto -DNDEBUG -funroll-loops -ffast-math")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native -mtune=native -flto -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -mtune=native -DNDEBUG -funroll-loops -ffast-math")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native -mtune=native -DNDEBUG")
 
 # Ultra-performance specific flags for Phase 1
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -mavx2 -mfma")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-stack-protector")
 
 # Link-time optimization
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto -Wl,--gc-sections")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-Wl,--gc-sections")
 
 # Debug flags
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG -fsanitize=address")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG -fsanitize=address -mavx2 -mfma")
+
 
 # Dependencies
 find_package(CURL REQUIRED)
@@ -53,6 +56,7 @@ else()
     add_compile_definitions(HAVE_HYPERSCAN=0)
 endif()
 
+
 # Include additional Git submodules (header-only)
 # This will make the 'concurrentqueue' target available
 include_git_submodule(third_party/concurrentqueue)
@@ -80,8 +84,12 @@ file(MAKE_DIRECTORY ${PROJECT_SOURCE_DIR}/../RawHTMLdata)
 
 # Define source files organized in modular structure
 set(SOURCES
-    # Core crawler components
-    src/core/crawler_main.cpp
+    # Core crawler components - UPDATED FOR NEW MODULAR STRUCTURE
+    src/core/crawler_main_new.cpp
+    src/core/crawler_core.cpp
+    src/core/crawler_workers.cpp
+    src/core/crawler_modes.cpp
+    src/core/crawler_monitoring.cpp
     
     # Configuration management
     src/config/config_loader.cpp
@@ -99,6 +107,7 @@ set(SOURCES
     src/queue/sharded_disk_queue.cpp
     src/queue/work_stealing_queue.cpp
     src/queue/html_processing_queue.cpp
+    src/queue/smart_frontier.cpp
     
     # Parsing and content processing
     src/parsing/ultra_parser.cpp
@@ -121,11 +130,14 @@ set(SOURCES
     # Utility functions
     src/utils/url_normalizer.cpp
     src/utils/utility_functions.cpp
-)
 
+    third_party/tracy/public/TracyClient.cpp
+)
+# Replace Tracy definitions with:
+add_definitions(-DTRACY_ENABLE)
 # Modular executable
 add_executable(crawler ${SOURCES})
-
+target_link_options(crawler PRIVATE -rdynamic)
 # Include directories for modular design
 target_include_directories(crawler PRIVATE
     ${PROJECT_SOURCE_DIR}/src
@@ -138,6 +150,7 @@ target_include_directories(crawler PRIVATE
     ${PROJECT_SOURCE_DIR}/src/monitoring
     ${PROJECT_SOURCE_DIR}/src/utils
     ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/third_party/tracy/public
 )
 
 # Linking for modular crawler

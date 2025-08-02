@@ -51,11 +51,6 @@ const std::vector<std::pair<uint32_t, uint32_t>> FastLanguageDetector::NON_ENGLI
     {0xac00, 0xd7a3}      // Hangul Syllables (Korean)
 };
 
-// HTML lang attribute regex - unchanged
-const std::regex FastLanguageDetector::HTML_LANG_REGEX(
-    R"(<html[^>]*lang\s*=\s*["']([^"']+)["'])", 
-    std::regex::icase
-);
 
 bool FastLanguageDetector::is_english_content(const std::string& html, const std::string& url) {
     // 1. Check HTML lang attribute (fastest check) - unchanged
@@ -87,13 +82,42 @@ bool FastLanguageDetector::is_english_content(const std::string& html, const std
 
 
 std::string FastLanguageDetector::extract_html_lang(const std::string& html) {
-    std::smatch match;
-    if (std::regex_search(html, match, HTML_LANG_REGEX) && match.size() > 1) {
-        std::string lang = match[1].str();
-        std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
-        return lang;
-    }
-    return "";
+    // Find lang attribute in HTML tag - REGEX-FREE implementation
+    size_t html_start = html.find("<html");
+    if (html_start == std::string::npos) return "";
+    
+    size_t html_end = html.find('>', html_start);
+    if (html_end == std::string::npos) return "";
+    
+    std::string html_tag = html.substr(html_start, html_end - html_start);
+    
+    // Look for lang= attribute
+    size_t lang_pos = html_tag.find("lang");
+    if (lang_pos == std::string::npos) return "";
+    
+    // Find the = sign after lang
+    size_t eq_pos = html_tag.find('=', lang_pos);
+    if (eq_pos == std::string::npos) return "";
+    
+    // Skip whitespace after =
+    size_t start = eq_pos + 1;
+    while (start < html_tag.length() && std::isspace(html_tag[start])) start++;
+    
+    if (start >= html_tag.length()) return "";
+    
+    // Extract quoted value
+    char quote = html_tag[start];
+    if (quote != '"' && quote != '\'') return "";
+    
+    start++; // Skip opening quote
+    size_t end = html_tag.find(quote, start);
+    if (end == std::string::npos) return "";
+    
+    std::string lang = html_tag.substr(start, end - start);
+    
+    // Convert to lowercase
+    std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
+    return lang;
 }
 
 bool FastLanguageDetector::is_english_domain(const std::string& url) {

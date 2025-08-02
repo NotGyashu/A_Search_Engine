@@ -3,13 +3,12 @@
 #include <vector>
 #include <unordered_set>
 #include <algorithm>
-#include <regex>
 #include <cstdint> 
 
 /**
  * 🌐 ULTRA-FAST LANGUAGE DETECTION
  * Zero-cost English detection for crawler
- * Uses pattern matching instead of heavy ML models
+ * Uses pattern matching instead of heavy ML models (REGEX-FREE)
  */
 class FastLanguageDetector {
 private:
@@ -19,8 +18,6 @@ private:
     // English-specific patterns
     static const std::vector<std::string> ENGLISH_PATTERNS;
     
-    // HTML lang attribute regex
-    static const std::regex HTML_LANG_REGEX;
     
 public:
     /**
