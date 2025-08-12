@@ -1,0 +1,37 @@
+🔍 SAMPLE PROCESSED DOCUMENTS
+========================================
+
+📄 DOCUMENT 1
+--------------------
+URL: https://python.org/tutorial/advanced
+Title: Advanced Python Programming Techniques and Best Practices
+Domain: python.org
+Content Type: documentation
+Categories: technical, educational, documentation
+Keywords: python, function, understanding, decorators, developers, applications, decorator, programming, classes, memory
+Snippet: Comprehensive guide covering advanced Python concepts including decorators, metaclasses, and performance optimization....
+
+📝 CHUNKS (2 total):
+  Chunk 1:
+    Quality: 3.00
+    Domain Score: 0.60
+    Words: 238
+    Text: Python programming offers sophisticated features that enable developers to write elegant, efficient, and maintainable code. This comprehensive tutoria...
+    Headings:
+      H1: Advanced Python Programming Techniques
+      H2: Introduction to Advanced Concepts
+      H2: Decorators and Metaprogramming
+
+  Chunk 2:
+    Quality: 3.00
+    Domain Score: 0.60
+    Words: 190
+    Text: While Python prioritizes developer productivity and code readability over raw execution speed, several techniques can dramatically improve performance...
+    Headings:
+      H1: Advanced Python Programming Techniques
+      H2: Introduction to Advanced Concepts
+      H2: Decorators and Metaprogramming
+
+
+========================================
+

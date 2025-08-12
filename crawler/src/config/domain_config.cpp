@@ -15,7 +15,6 @@ std::unique_ptr<DomainConfigManager> g_domain_config_manager = nullptr;
 DomainConfigManager::DomainConfigManager() {
     // Initialize default configuration
     default_config_.crawl_frequency = CrawlFrequencyConfig{};
-    default_config_.snippet_config = SnippetExtraction::SnippetConfig{};
     default_config_.enabled = true;
     default_config_.priority_multiplier = 1.0f;
 }
@@ -87,7 +86,7 @@ void DomainConfigManager::parse_json_config(const std::string& json_content) {
             try {
                 DomainConfig config = parse_domain_config_json_modern(&domain_config);
                 domain_configs_[normalize_domain(domain)] = config;
-                std::cout << "   Loaded config for domain: " << domain << std::endl;
+                // std::cout << "   Loaded config for domain: " << domain << std::endl;
             } catch (const std::exception& e) {
                 std::cerr << "⚠️  Error parsing config for domain " << domain << ": " << e.what() << std::endl;
             }
@@ -132,16 +131,6 @@ DomainConfig DomainConfigManager::parse_domain_config_json_modern(const void* do
                 }
             } catch (const std::exception& e) {
                 std::cerr << "⚠️  Invalid frequency value: " << freq_str << std::endl;
-            }
-        }
-    }
-    
-    // Parse snippet_tag_filter
-    if (domain_json.contains("snippet_tag_filter") && domain_json["snippet_tag_filter"].is_array()) {
-        config.snippet_config.priority_tags.clear();
-        for (const auto& tag : domain_json["snippet_tag_filter"]) {
-            if (tag.is_string()) {
-                config.snippet_config.priority_tags.push_back(tag.get<std::string>());
             }
         }
     }
@@ -230,7 +219,6 @@ void DomainConfigManager::print_domain_configs() const {
         std::cout << "   Domain: " << domain << "\n";
         std::cout << "     Crawl interval: " << config.crawl_frequency.crawl_interval.count() << "h\n";
         std::cout << "     Use freshness: " << (config.crawl_frequency.use_freshness_based ? "yes" : "no") << "\n";
-        std::cout << "     Priority tags: " << config.snippet_config.priority_tags.size() << "\n";
         std::cout << "     Language filter: " << config.language_whitelist.size() << " languages\n";
         std::cout << "     Enabled: " << (config.enabled ? "yes" : "no") << "\n";
     }

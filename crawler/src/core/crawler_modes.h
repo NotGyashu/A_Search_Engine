@@ -1,3 +1,5 @@
+// Shutdown curl globally after all resources are destroyed
+void shutdown_curl_global();
 #pragma once
 
 #include "crawler_core.h"
@@ -21,7 +23,7 @@ void run_fresh_mode(int max_runtime_minutes);
 void initialize_regular_mode_components(int max_depth, int max_queue_size);
 void initialize_fresh_mode_components();
 void setup_rss_poller(CrawlerMode mode, HttpClient* http_client, int network_workers);
-void setup_sitemap_parser(HttpClient* http_client);
+void setup_sitemap_parser(HttpClient* http_client, RobotsTxtCache* robots_cache);
 void start_worker_threads(int network_workers, int html_workers, CrawlerMode mode,
                          RobotsTxtCache& robots, RateLimiter& limiter,
                          DomainBlacklist& blacklist, ErrorTracker& error_tracker,

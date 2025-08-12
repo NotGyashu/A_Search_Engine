@@ -2,10 +2,15 @@
 #include "crawler_workers.h"
 #include "crawler_core.h"
 #include "crawler_monitoring.h"
+#include "gdrive_mount_manager.h"
+#include "gdrive_mount_storage.h"
+#include "time_utils.h"
 #include <iostream>
 #include <thread>
 #include <vector>
 #include <signal.h>
+#include <filesystem>
+#include <chrono>
 #include "tracy/Tracy.hpp"
 
 /**
@@ -40,8 +45,7 @@ void run_regular_mode(int max_threads, int max_depth, int max_queue_size, int ma
     DomainBlacklist blacklist;
     ErrorTracker error_tracker;
     
-    // Load blacklist if available
-    blacklist.load_from_file(CrawlerConstants::Paths::BLACKLIST_PATH);
+
     
     // Load seed URLs from configuration
     auto seed_urls = ConfigLoader::load_seed_urls(std::string(CrawlerConstants::Paths::CONFIG_PATH) + "/seeds.json");
@@ -56,7 +60,7 @@ void run_regular_mode(int max_threads, int max_depth, int max_queue_size, int ma
         };
     }
 
-    std::cout << "🌱 Loaded " << seed_urls.size() << " seed URLs from configuration\n";
+    // std::cout << "🌱 Loaded " << seed_urls.size() << " seed URLs from configuration\n";
 
     // Seed the frontiers
     int successfully_seeded_smart = 0;
@@ -88,10 +92,26 @@ void run_regular_mode(int max_threads, int max_depth, int max_queue_size, int ma
 
     // Setup RSS poller and sitemap parser
     setup_rss_poller(CrawlerMode::REGULAR, &http_client, network_workers);
-    setup_sitemap_parser(&http_client);
+    setup_sitemap_parser(&http_client, &robots);
     
-    // Load sitemaps from JSON config
-    sitemap_parser->load_sitemaps_from_json(std::string(CrawlerConstants::Paths::CONFIG_PATH) + "/sitemaps.json");
+    // Add domains to monitor for sitemap discovery from seed URLs
+    std::vector<std::string> domains_to_monitor;
+    for (const auto& url : seed_urls) {
+        try {
+            std::string domain = UrlNormalizer::extract_domain(url);
+            if (std::find(domains_to_monitor.begin(), domains_to_monitor.end(), domain) == domains_to_monitor.end()) {
+                domains_to_monitor.push_back(domain);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "⚠️  Warning: Failed to extract domain from seed " << url << ": " << e.what() << std::endl;
+        }
+    }
+    
+    if (!domains_to_monitor.empty()) {
+        sitemap_parser->add_domains_to_monitor(domains_to_monitor);
+        std::cout << "   Monitoring " << domains_to_monitor.size() << " domains for sitemap discovery\n";
+    }
+    
     sitemap_parser->start_parsing();
     std::cout << "   Sitemap parser started\n";
 
@@ -104,7 +124,7 @@ void run_regular_mode(int max_threads, int max_depth, int max_queue_size, int ma
                         network_workers_threads, html_workers_threads);
     
     // Start enhanced monitoring thread
-    std::thread monitor_thread([]() { enhanced_monitoring_thread(CrawlerMode::REGULAR); });
+        std::thread monitor_thread([]() { enhanced_monitoring_thread(CrawlerMode::REGULAR); });
     
     
 
@@ -126,65 +146,63 @@ void run_regular_mode(int max_threads, int max_depth, int max_queue_size, int ma
         }).detach();
     }
     
-    // Wait for worker completion
+    // 1. Signal all workers to stop (stop_flag is already set by signal handler or timeout)
+    // 🛡️ NEW COORDINATED SHUTDOWN SEQUENCE
+    // Wait for monitoring thread to complete shutdown coordination
+    if (monitor_thread.joinable()) {
+        monitor_thread.join();
+    }
+    
+    // 2. Wait for all worker threads to finish (coordinated shutdown handles this)
+    std::cout << "⏳ Waiting for network workers to finish..." << std::endl;
     for (auto& worker : network_workers_threads) {
         if (worker.joinable()) {
             worker.join();
         }
     }
-    
-    // Shutdown HTML processing pipeline
-    html_processing_queue->shutdown();
+
+    std::cout << "⏳ Waiting for HTML workers to finish..." << std::endl;
     for (auto& worker : html_workers_threads) {
         if (worker.joinable()) {
             worker.join();
         }
     }
-    
-    // Graceful shutdown of other components
-    if (rss_poller) {
-        rss_poller->stop();
-    }
-    if (sitemap_parser) {
-        sitemap_parser->stop();
-    }
-    
-    if (monitor_thread.joinable()) {
-        monitor_thread.join();
-    }
-    
-    // Print final results
+
+    // 3. Gather final statistics BEFORE cleanup
     std::cout << "\n🎯 FINAL REGULAR MODE RESULTS\n";
     std::cout << "===================================\n";
-    global_monitor.print_stats(smart_url_frontier->size(), 0);
+    global_monitor.print_stats(smart_url_frontier ? smart_url_frontier->size() : 0, 0);
     
     UltraParser::UltraHTMLParser ultra_parser;
     ultra_parser.print_performance_stats();
     
     std::cout << "📊 FINAL QUEUE STATS:\n";
-    std::cout << "   Smart Queue: " << smart_url_frontier->size() << " URLs remaining\n";
-    std::cout << "   Sharded Disk Queue: " << sharded_disk_queue->get_total_disk_queue_size() << " URLs remaining\n";
-    std::cout << "   Work Stealing Queue: " << work_stealing_queue->total_size() << " URLs remaining\n";
-    std::cout << "   HTML Processing Queue: " << html_processing_queue->size() << " tasks remaining\n";
-    std::cout << "   Metadata Store: " << metadata_store->size() << " URLs tracked\n";
+    std::cout << "   Smart Queue: " << (smart_url_frontier ? smart_url_frontier->size() : 0) << " URLs remaining\n";
+    std::cout << "   Sharded Disk Queue: " << (sharded_disk_queue ? sharded_disk_queue->get_total_disk_queue_size() : 0) << " URLs remaining\n";
+    std::cout << "   Work Stealing Queue: " << (work_stealing_queue ? work_stealing_queue->total_size() : 0) << " URLs remaining\n";
+    std::cout << "   HTML Processing Queue: " << (html_processing_queue ? html_processing_queue->size() : 0) << " tasks remaining\n";
+    std::cout << "   Metadata Store: " << (metadata_store ? metadata_store->size() : 0) << " URLs tracked\n";
     
     double final_rate = global_monitor.get_crawl_rate();
-        std::cout << "📊 Performance: " << std::fixed << std::setprecision(1) 
-                 << final_rate << " pages/sec\n";
+    std::cout << "📊 Performance: " << std::fixed << std::setprecision(1) 
+             << final_rate << " pages/sec\n";
     
+    // Print component stats before cleanup
+    if (rss_poller) rss_poller->print_feed_stats();
+    if (sitemap_parser) sitemap_parser->print_sitemap_stats();
+    if (conditional_get_manager) conditional_get_manager->print_cache_stats();
     
-    // Cleanup
-    // Remove crawl_logger usage - no longer needed
-    // crawl_logger->flush();
-    enhanced_storage->flush();
+    // 4. Now safely clean up all components
+    std::cout << "🧹 Performing safe component cleanup..." << std::endl;
+    cleanup_components_safely();
     
-    rss_poller->print_feed_stats();
-    sitemap_parser->print_sitemap_stats();
-    conditional_get_manager->print_cache_stats();
-    
-    curl_global_cleanup();
-    
+    // Note: cleanup_components_safely() was already called above
     std::cout << "🏁 Regular mode crawler shutdown complete.\n";
+}
+
+// Call curl_global_cleanup() at the very end, after all run mode functions return
+void shutdown_curl_global() {
+    curl_global_cleanup();
 }
 
 /**
@@ -221,8 +239,7 @@ void run_fresh_mode(int max_runtime_minutes) {
     DomainBlacklist blacklist;
     ErrorTracker error_tracker;
     
-    // Load blacklist if available
-    blacklist.load_from_file(CrawlerConstants::Paths::BLACKLIST_PATH);
+
     
     std::cout << "🚫 Skipping seed URLs and sitemaps in FRESH mode.\n";
     
@@ -267,49 +284,52 @@ void run_fresh_mode(int max_runtime_minutes) {
         }
     }
     
-    // Shutdown HTML processing pipeline
-    html_processing_queue->shutdown();
+    // 🛡️ NEW COORDINATED SHUTDOWN SEQUENCE FOR FRESH MODE
+    // Wait for monitoring thread to complete shutdown coordination
+    if (monitor_thread.joinable()) {
+        monitor_thread.join();
+    }
+    
+    // Wait for all worker threads to finish
+    std::cout << "⏳ Waiting for network workers to finish..." << std::endl;
+    for (auto& worker : network_workers_threads) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
+
+    std::cout << "⏳ Waiting for HTML workers to finish..." << std::endl;
     for (auto& worker : html_workers_threads) {
         if (worker.joinable()) {
             worker.join();
         }
     }
     
-    // Graceful shutdown of RSS poller
-    if (rss_poller) {
-        rss_poller->stop();
-    }
-    
-    if (monitor_thread.joinable()) {
-        monitor_thread.join();
-    }
-    
-    // Print final results
+    // Gather final statistics BEFORE cleanup
     std::cout << "\n🎯 FINAL FRESH MODE RESULTS\n";
     std::cout << "===================================\n";
-    global_monitor.print_stats(smart_url_frontier->size(), 0);
+    global_monitor.print_stats(smart_url_frontier ? smart_url_frontier->size() : 0, 0);
     
     std::cout << "📊 FINAL QUEUE STATS:\n";
-    std::cout << "   Smart Queue: " << smart_url_frontier->size() << " URLs remaining\n";
-    std::cout << "   Work Stealing Queue: " << work_stealing_queue->total_size() << " URLs remaining\n";
-    std::cout << "   HTML Processing Queue: " << html_processing_queue->size() << " tasks remaining\n";
-    std::cout << "   Metadata Store: " << metadata_store->size() << " URLs tracked\n";
+    std::cout << "   Smart Queue: " << (smart_url_frontier ? smart_url_frontier->size() : 0) << " URLs remaining\n";
+    std::cout << "   Work Stealing Queue: " << (work_stealing_queue ? work_stealing_queue->total_size() : 0) << " URLs remaining\n";
+    std::cout << "   HTML Processing Queue: " << (html_processing_queue ? html_processing_queue->size() : 0) << " tasks remaining\n";
+    std::cout << "   Metadata Store: " << (metadata_store ? metadata_store->size() : 0) << " URLs tracked\n";
     std::cout << "   NOTE: Disk queue disabled in FRESH mode\n";
     
     double final_rate = global_monitor.get_crawl_rate();
     std::cout << "📊 Fresh Mode Performance: " << std::fixed << std::setprecision(1) 
              << final_rate << " pages/sec\n";
     
-    // Cleanup
-    // Remove crawl_logger usage - no longer needed  
-    // crawl_logger->flush();
-    enhanced_storage->flush();
+    // Print component stats before cleanup
+    if (rss_poller) rss_poller->print_feed_stats();
+    if (conditional_get_manager) conditional_get_manager->print_cache_stats();
     
-    rss_poller->print_feed_stats();
-    conditional_get_manager->print_cache_stats();
+    // Now safely clean up all components
+    std::cout << "🧹 Performing safe component cleanup..." << std::endl;
+    cleanup_components_safely();
     
-    curl_global_cleanup();
-    
+    // Note: cleanup_components_safely() was already called above
     std::cout << "🏁 Fresh mode crawler shutdown complete.\n";
 }
 
@@ -326,9 +346,35 @@ void initialize_regular_mode_components(int max_depth, int max_queue_size) {
     smart_url_frontier->set_max_depth(max_depth);
     smart_url_frontier->set_max_queue_size(max_queue_size);
     
-    // Phase 1: Initialize enhanced storage with metadata support
-    enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
-        CrawlerConstants::Paths::RAW_DATA_PATH, metadata_store);
+    // Phase 1: Initialize Google Drive mount manager
+    // First, cleanup any existing mounts
+    GDriveMountManager::cleanup_existing_mount(CrawlerConstants::GDriveMount::MOUNT_POINT);
+    
+    gdrive_mount_manager = std::make_shared<GDriveMountManager>(
+        CrawlerConstants::GDriveMount::RCLONE_REMOTE,
+        CrawlerConstants::GDriveMount::REMOTE_PATH,
+        CrawlerConstants::GDriveMount::MOUNT_POINT
+    );
+    
+    // Initialize Google Drive mount
+    if (!gdrive_mount_manager->initialize()) {
+        std::cerr << "❌ Failed to initialize Google Drive mount. Falling back to local-only storage." << std::endl;
+        // Fall back to regular storage
+        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
+            CrawlerConstants::Paths::RAW_DATA_PATH, metadata_store);
+    } else {
+        std::cout << "✅ Google Drive mount enabled for REGULAR mode" << std::endl;
+        // Create mount-aware storage that writes directly to Google Drive
+        auto mount_storage = std::make_unique<CrawlScheduling::GDriveMountStorage>(
+            gdrive_mount_manager, metadata_store, "REGULAR");
+        
+        // Wrap in EnhancedFileStorageManager interface for compatibility
+        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
+            gdrive_mount_manager->get_daily_path(TimeUtils::current_date_string()),
+            metadata_store);
+        
+        std::cout << "📁 Storage path: " << gdrive_mount_manager->get_daily_path(TimeUtils::current_date_string()) << std::endl;
+    }
     
     // Remove crawl_logger initialization - no longer needed
     // crawl_logger = std::make_unique<CrawlLogger>(
@@ -341,11 +387,12 @@ void initialize_regular_mode_components(int max_depth, int max_queue_size) {
     html_processing_queue = std::make_unique<HtmlProcessingQueue>();
     
     // Initialize work-stealing queue with size limits to force disk queue usage
-    size_t work_queue_per_worker = CrawlerConstants::Workers::MAX_WORK_STEALING_QUEUE_SIZE; // Limit each worker to 500 URLs max
+    size_t work_queue_per_worker = CrawlerConstants::Queue::MAX_WORK_STEALING_QUEUE_SIZE; // Limit each worker to 500 URLs max
     work_stealing_queue = std::make_unique<WorkStealingQueue>(
         std::min(CrawlerConstants::Workers::DEFAULT_MAX_THREADS, 
                 (int)std::thread::hardware_concurrency()), 
         work_queue_per_worker);
+
     
     shared_domain_queues = std::make_unique<SharedDomainQueueManager>();
     
@@ -354,15 +401,14 @@ void initialize_regular_mode_components(int max_depth, int max_queue_size) {
     std::cout << "   Work Stealing: max " << work_stealing_queue->get_max_size() << " URLs (" << work_queue_per_worker << " per worker)\n";
     std::cout << "   Disk Queue: unlimited (persistent storage)\n";
     
-    // Initialize intelligent snippet extraction and domain configuration
+    // Initialize intelligent  extraction and domain configuration
     try {
         domain_config_manager = std::make_unique<DomainConfiguration::DomainConfigManager>();
         domain_config_manager->load_config(std::string(CrawlerConstants::Paths::CONFIG_PATH) + "/domain_configs.json");
-        snippet_extractor = SnippetExtraction::SnippetExtractorFactory::create_extractor();
-        std::cout << "✅ Initialized snippet extraction and domain configuration\n";
+        std::cout << "✅ Initialized  extraction and domain configuration\n";
     } catch (const std::exception& e) {
-        std::cerr << "⚠️  Warning: Failed to initialize snippet/domain config: " << e.what() << std::endl;
-        // Continue without snippet extraction
+        std::cerr << "⚠️  Warning: Failed to initialize /domain config: " << e.what() << std::endl;
+        // Continue without  extraction
     }
     
     // ✅ DIRECTORY CREATION — Ensure all paths exist before reading/writing
@@ -392,9 +438,35 @@ void initialize_fresh_mode_components() {
     smart_url_frontier->set_max_depth(CrawlerConstants::FreshMode::MAX_CRAWL_DEPTH);
     smart_url_frontier->set_max_queue_size(CrawlerConstants::FreshMode::MAX_QUEUE_SIZE);
     
-    // Phase 1: Initialize enhanced storage with metadata support
-    enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
-        CrawlerConstants::Paths::RAW_DATA_PATH, metadata_store);
+    // Phase 1: Initialize Google Drive mount manager for FRESH mode
+    // First, cleanup any existing mounts
+    GDriveMountManager::cleanup_existing_mount(CrawlerConstants::GDriveMount::MOUNT_POINT);
+    
+    gdrive_mount_manager = std::make_shared<GDriveMountManager>(
+        CrawlerConstants::GDriveMount::RCLONE_REMOTE,
+        CrawlerConstants::GDriveMount::REMOTE_PATH,
+        CrawlerConstants::GDriveMount::MOUNT_POINT
+    );
+    
+    // Initialize Google Drive mount
+    if (!gdrive_mount_manager->initialize()) {
+        std::cerr << "❌ Failed to initialize Google Drive mount. Falling back to local-only storage." << std::endl;
+        // Fall back to regular storage
+        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
+            std::string(CrawlerConstants::Paths::RAW_DATA_PATH) + "/Live", metadata_store);
+    } else {
+        std::cout << "✅ Google Drive mount enabled for FRESH mode" << std::endl;
+        // Create mount-aware storage that writes directly to Google Drive Live folder
+        auto mount_storage = std::make_unique<CrawlScheduling::GDriveMountStorage>(
+            gdrive_mount_manager, metadata_store, "FRESH");
+        
+        // Wrap in EnhancedFileStorageManager interface for compatibility
+        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
+            gdrive_mount_manager->get_live_path(),
+            metadata_store);
+        
+        std::cout << "📁 Live storage path: " << gdrive_mount_manager->get_live_path() << std::endl;
+    }
     
     // Remove crawl_logger initialization - no longer needed for fresh mode
     // crawl_logger = std::make_unique<CrawlLogger>(
@@ -437,7 +509,7 @@ void initialize_fresh_mode_components() {
 }
 
 void setup_rss_poller(CrawlerMode mode, HttpClient* http_client, int network_workers) {
-    rss_poller = std::make_unique<FeedPolling::RSSAtomPoller>([&,mode](const std::vector<FeedPolling::FeedEntry>& entries) {
+    rss_poller = std::make_unique<FeedPolling::RSSAtomPoller>([&,mode,network_workers](const std::vector<FeedPolling::FeedEntry>& entries) {
         std::cout << "🔄 RSS Callback triggered with " << entries.size() << " entries" << std::endl;
         
         if (!entries.empty() && !stop_flag) {
@@ -453,18 +525,18 @@ void setup_rss_poller(CrawlerMode mode, HttpClient* http_client, int network_wor
                             std::cerr << "❌ ERROR: network_workers is " << network_workers << ", cannot distribute URLs. Skipping URL: " << entry.url << std::endl;
                             continue;
                         }
-                        size_t worker_id = std::hash<std::string>{}(entry.url) % network_workers;
+                        size_t worker_id = std::hash<std::string>{}(entry.url) % static_cast<size_t>(network_workers);
                         if (work_stealing_queue->push_local(worker_id, url_info)) {
                             urls_added++;
-                            std::cout << "✅ FRESH mode: RSS Feed URL added to queue: " << entry.url << std::endl;
+                            std::cout << "✅ FRESH mode: RSS Feed URL added to queue: " << entry.url << " (worker " << worker_id << "/" << network_workers << ")" << std::endl;
                         } else {
-                            std::cout << "❌ FRESH mode: Failed to add RSS URL to queue: " << entry.url << std::endl;
+                            std::cout << "❌ FRESH mode: Failed to add RSS URL to queue: " << entry.url << " (worker " << worker_id << "/" << network_workers << ")" << std::endl;
                         }
                     } else {
                         // REGULAR mode behavior
                         if (smart_url_frontier && smart_url_frontier->enqueue(url_info)) {
                             urls_added++;
-                            std::cout << "✅ REGULAR mode: RSS Feed URL added to queue: " << entry.url << std::endl;
+                            // std::cout << "✅ REGULAR mode: RSS Feed URL added to queue: " << entry.url << std::endl;
                         } else {
                             std::cout << "❌ REGULAR mode: Failed to add RSS URL to queue: " << entry.url << std::endl;
                         }
@@ -493,7 +565,9 @@ void setup_rss_poller(CrawlerMode mode, HttpClient* http_client, int network_wor
     std::cout << "   RSS/Atom poller started\n";
 }
 
-void setup_sitemap_parser(HttpClient* http_client) {
+
+
+void setup_sitemap_parser(HttpClient* http_client, RobotsTxtCache* robots_cache) {
     // Phase 2: Initialize sitemap parser
     sitemap_parser = std::make_unique<SitemapParsing::SitemapParser>([&](const std::vector<SitemapParsing::SitemapUrl>& urls) {
         if (!urls.empty() && smart_url_frontier && !stop_flag) {
@@ -506,9 +580,8 @@ void setup_sitemap_parser(HttpClient* http_client) {
                 }
             }
         }
-    }, http_client);
+    }, http_client, robots_cache);
 }
-
 void start_worker_threads(int network_workers, int html_workers, CrawlerMode mode,
                          RobotsTxtCache& robots, RateLimiter& limiter,
                          DomainBlacklist& blacklist, ErrorTracker& error_tracker,

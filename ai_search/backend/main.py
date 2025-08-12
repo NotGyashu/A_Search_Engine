@@ -5,14 +5,23 @@ Run this to start the AI Search Engine backend server
 
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+import os
+import uvicorn
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Import and run the server
+# Load environment variables from .env
+load_dotenv()
+
+# Get values from .env with defaults
+BACKEND_HOST = os.getenv("BACKEND_HOST", "0.0.0.0")
+BACKEND_PORT = int(os.getenv("BACKEND_PORT", 8000))
+BACKEND_LOG_LEVEL = os.getenv("BACKEND_LOG_LEVEL", "info")
+
+# Import the FastAPI app
 from backend.api.server import app
-import uvicorn
-from common.config import BACKEND_HOST, BACKEND_PORT, BACKEND_LOG_LEVEL
 
 if __name__ == "__main__":
     print("🚀 Starting AI Search Engine Backend Server...")

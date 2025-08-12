@@ -10,6 +10,10 @@ pydantic==2.5.0
 requests==2.31.0
 python-multipart==0.0.6
 websockets==12.0             # WebSocket support for real-time AI summaries
+elasticsearch==8.12.0
+opensearch-py==2.4.2         # OpenSearch client
+boto3==1.34.10               # AWS SDK for OpenSearch authentication
+requests-aws4auth==1.2.3     # AWS authentication for OpenSearch
 
 # ===== BACKEND UTILITIES =====
 python-dotenv==1.0.0         # Load env variables from .env

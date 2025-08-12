@@ -1,4 +1,5 @@
 #include "work_stealing_queue.h"
+#include <iostream>
 
 WorkStealingQueue::WorkStealingQueue(size_t num_workers, size_t max_per_worker)
     : num_workers_(num_workers),
@@ -13,6 +14,11 @@ WorkStealingQueue::WorkStealingQueue(size_t num_workers, size_t max_per_worker)
 }
 
 bool WorkStealingQueue::push_local(size_t worker_id, const UrlInfo& url) {
+    if (worker_id >= num_workers_) {
+        // Invalid worker_id - this should never happen in correct usage
+        std::cout << "Invalid worker_id: " << worker_id << std::endl;
+        return false;
+    }
     auto& q = *worker_queues_[worker_id];
     std::scoped_lock lk(q.mutex);
     if (q.size.load(std::memory_order_relaxed) >= q.max_size) return false;
@@ -22,6 +28,10 @@ bool WorkStealingQueue::push_local(size_t worker_id, const UrlInfo& url) {
 }
 
 bool WorkStealingQueue::pop_local(size_t worker_id, UrlInfo& url) {
+    if (worker_id >= num_workers_) {
+        // Invalid worker_id - this should never happen in correct usage
+        return false;
+    }
     auto& q = *worker_queues_[worker_id];
     std::scoped_lock lk(q.mutex);
     if (q.local_queue.empty()) return false;
@@ -32,6 +42,10 @@ bool WorkStealingQueue::pop_local(size_t worker_id, UrlInfo& url) {
 }
 
 bool WorkStealingQueue::try_steal(size_t worker_id, UrlInfo& url) {
+    if (worker_id >= num_workers_) {
+        // Invalid worker_id - this should never happen in correct usage
+        return false;
+    }
     size_t victim = (worker_id + steal_counter_.fetch_add(1, std::memory_order_relaxed) + 1) % num_workers_;
     auto& q = *worker_queues_[victim];
     std::scoped_lock lk(q.mutex);

@@ -77,13 +77,8 @@ float ContentFilter::calculate_priority(const std::string& url, int depth) {
     float priority = std::max(CrawlerConstants::Priority::MIN_PRIORITY, 
                              1.0f - (depth * CrawlerConstants::Priority::DEPTH_PENALTY));
     
-    // High priority domains
-    if (high_priority_domains_.find(domain) != high_priority_domains_.end()) {
-        priority *= 1.5f;
-    }
-    
-    // Educational and government domains
-    if (domain.find(".edu") != std::string::npos || domain.find(".gov") != std::string::npos) {
+    // high priority or  Educational and government domains
+    if ((high_priority_domains_.find(domain) != high_priority_domains_.end()) ||domain.find(".edu") != std::string::npos || domain.find(".gov") != std::string::npos) {
         priority *= 1.3f;
     }
     
@@ -110,6 +105,7 @@ bool ContentFilter::is_high_quality_content(const std::string& html) {
     }
     
     // Should contain some actual content
+    //TODO: Use a more sophisticated HTML parser in the future
     size_t text_content = 0;
     bool in_tag = false;
     for (char c : html) {

@@ -15,6 +15,26 @@ enum class RobotsCheckResult {
     DEFERRED_FETCH_STARTED
 };
 
+// Sitemap information structure
+struct SitemapInfo {
+    std::string url;
+    float priority = 0.5f; // 0.0 to 1.0, higher is more important
+    int parse_interval_hours = 24; // How often to parse this sitemap
+    std::chrono::system_clock::time_point discovered_time;
+    
+    SitemapInfo(const std::string& u = "", float p = 0.5f) : url(u), priority(p) {
+        discovered_time = std::chrono::system_clock::now();
+        // Set parse interval based on priority
+        if (priority >= 0.8f) {
+            parse_interval_hours = 12; // High priority: parse every 12 hours
+        } else if (priority >= 0.5f) {
+            parse_interval_hours = 24; // Medium priority: parse daily
+        } else {
+            parse_interval_hours = 48; // Low priority: parse every 2 days
+        }
+    }
+};
+
 class RobotsTxtCache {
 private:
     struct RobotsInfo {
@@ -23,6 +43,8 @@ private:
         bool is_valid = false;
         int last_http_status = 0; // Store the last HTTP status for re-fetch logic
         int crawl_delay = 0; // Crawl-delay in seconds
+        std::vector<SitemapInfo> sitemaps; // Discovered sitemaps from this robots.txt
+        bool sitemaps_parsed = false; // Whether we've extracted sitemaps from content
     };
     
     mutable std::mutex mutex_;
@@ -41,6 +63,9 @@ private:
     // Helper method for parsing rules
     bool parse_rules(const std::string& content, const std::string& user_agent, 
                      std::vector<std::string>& allowed, std::vector<std::string>& disallowed) const;
+                     
+    // Helper method for parsing sitemaps from robots.txt content
+    std::vector<SitemapInfo> parse_sitemaps_from_robots(const std::string& content) const;
 
 public:
     explicit RobotsTxtCache(const std::string& db_path);
@@ -56,4 +81,23 @@ public:
      * forcing a fresh download on the next request to that domain.
      */
     void invalidate_for_domain(const std::string& domain);
+    
+    /**
+     * Get all discovered sitemaps for a domain.
+     * Returns empty vector if domain not in cache or no sitemaps found.
+     * Thread-safe.
+     */
+    std::vector<SitemapInfo> get_sitemaps_for_domain(const std::string& domain);
+    
+    /**
+     * Check if robots.txt exists for a domain (either in memory or disk cache).
+     * Thread-safe.
+     */
+    bool has_robots_for_domain(const std::string& domain) const;
+    
+    /**
+     * Get crawl delay for a domain. Returns 0 if no delay specified or domain not cached.
+     * Thread-safe.
+     */
+    int get_crawl_delay(const std::string& domain) const;
 };

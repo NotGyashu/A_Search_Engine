@@ -4,13 +4,16 @@ bin/
 *.o
 *.so
 *.a
-
+html
 # Virtual environments and Python environments
 venv/
 venv-ai*
 .env
 .env*
-
+dp-venv
+ai-venv
+be-venv
+Doxyfile
 # Python caches and compiled files
 __pycache__/
 *.py[cod]

@@ -31,11 +31,14 @@ private:
     mutable std::mutex mutex_;
     std::condition_variable cv_;
     std::atomic<bool> shutdown_{false};
-    static constexpr size_t MAX_QUEUE_SIZE = 1000;
+    std::atomic<bool> interrupt_flag_{false};
+    
+    
 
 public:
     bool enqueue(HtmlProcessingTask&& task);
     bool dequeue(HtmlProcessingTask& task);
     void shutdown();
+    void interrupt_waits();
     size_t size() const;
 };

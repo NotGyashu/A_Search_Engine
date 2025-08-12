@@ -33,7 +33,7 @@ struct UrlMetadata {
         auto now = std::chrono::system_clock::now();
         last_crawl_time = now;
         previous_change_time = now;
-        expected_next_crawl = now;
+        expected_next_crawl = now; // Make new URLs ready immediately
     }
     
     void update_next_crawl_time() {

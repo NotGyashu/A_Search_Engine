@@ -9,6 +9,9 @@
 #include <signal.h>
 #include "tracy/Tracy.hpp"
 
+// Global signal flag - must be volatile sig_atomic_t for async-signal-safety
+static volatile sig_atomic_t signal_received = 0;
+
 /**
  * 📊 ENHANCED MONITORING THREAD with Always-On Queue & Speed Logging
  */
@@ -33,6 +36,7 @@ void enhanced_monitoring_thread(CrawlerMode mode) {
     // Initial queue status - log immediately at startup
     size_t initial_smart_size = smart_url_frontier->size();
     size_t initial_disk_queue_size = (mode == CrawlerMode::REGULAR && sharded_disk_queue) ? sharded_disk_queue->get_total_disk_queue_size() : 0;
+
     size_t initial_work_stealing_size = work_stealing_queue->total_size();
     std::cout << "🔍 STARTUP QUEUE STATUS:\n";
     std::cout << "   Smart Queue: " << initial_smart_size << " URLs\n";
@@ -46,7 +50,23 @@ void enhanced_monitoring_thread(CrawlerMode mode) {
     std::cout << "   Total Available: " << (initial_smart_size + initial_disk_queue_size + initial_work_stealing_size) << " URLs\n\n";
     
     while (!stop_flag) {
-        std::this_thread::sleep_for(std::chrono::seconds(CrawlerConstants::Monitoring::QUEUE_CHECK_INTERVAL_SECONDS));
+        // Check for shutdown coordination with timeout
+        std::unique_lock<std::mutex> lock(shutdown_coordinator_mutex);
+        if (shutdown_coordinator_cv.wait_for(lock, std::chrono::seconds(CrawlerConstants::Monitoring::QUEUE_CHECK_INTERVAL_SECONDS), 
+                                           [] { return stop_flag.load(); })) {
+            // Shutdown signal received - begin coordinated shutdown
+            std::cout << "\n🛑 Shutdown signal received. Beginning coordinated shutdown...\n";
+            coordinated_shutdown();
+            break;
+        }
+        
+        // Check for signal reception in main thread (safe to do complex operations here)
+        if (signal_received != 0) {
+            std::cout << "\nReceived shutdown signal (" << signal_received << "). Gracefully shutting down hybrid crawler...\n";
+            stop_flag = true;
+            coordinated_shutdown();
+            break;
+        }
         
         auto now = std::chrono::steady_clock::now();
         auto elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(now - monitoring_start).count();
@@ -125,7 +145,7 @@ void enhanced_monitoring_thread(CrawlerMode mode) {
         if (mode == CrawlerMode::REGULAR && has_disk_queue) {
             // 1. Refill from sharded disk when smart queue gets low
             if (smart_queue_size < CrawlerConstants::Queue::REFILL_THRESHOLD && disk_queue_size > 0) {
-                auto loaded_urls = sharded_disk_queue->load_urls_from_disk(CrawlerConstants::Queue::REFILL_THRESHOLD);
+                auto loaded_urls = sharded_disk_queue->load_urls_from_disk(CrawlerConstants::Queue::DISK_LOAD_BATCH_SIZE);
                 int refilled = 0;
                 
                 for (const auto& url : loaded_urls) {
@@ -154,7 +174,7 @@ void enhanced_monitoring_thread(CrawlerMode mode) {
         
         // 🗃️ AGGRESSIVE DISK QUEUE USAGE - Only in REGULAR mode
         if (mode == CrawlerMode::REGULAR && has_disk_queue) {
-            size_t smart_queue_capacity = 1000; // Assuming max queue size set to 1000
+            size_t smart_queue_capacity = CrawlerConstants::Queue::DEFAULT_MAX_QUEUE_SIZE; // Assuming max queue size set to 1000
             size_t work_stealing_capacity = work_stealing_queue->get_max_size();
             
             // Calculate memory usage percentages
@@ -266,14 +286,18 @@ std::vector<std::string> EmergencySeedInjector::get_emergency_seeds() {
         
         // Simple JSON parsing for emergency_seeds array
         std::vector<std::string> seeds;
+        
+        // First try to find "emergency_seeds" field (object format)
         size_t start = json_content.find("\"emergency_seeds\"");
-        if (start == std::string::npos) {
-            std::cerr << "⚠️  Warning: 'emergency_seeds' field not found in config\n";
-            return {};
+        if (start != std::string::npos) {
+            // Object format: {"emergency_seeds": [...]}
+            start = json_content.find("[", start);
+        } else {
+            // Array format: [...]
+            start = json_content.find("[");
         }
         
-        start = json_content.find("[", start);
-        size_t end = json_content.find("]", start);
+        size_t end = json_content.rfind("]");
         if (start == std::string::npos || end == std::string::npos) {
             std::cerr << "⚠️  Warning: Invalid JSON format in emergency seeds config\n";
             return {};
@@ -327,30 +351,10 @@ bool EmergencySeedInjector::inject_emergency_seeds(int& injection_count, const i
 }
 
 void signal_handler(int signal) {
-    static std::atomic<int> shutdown_count{0};
-    int count = shutdown_count.fetch_add(1);
+    // Only async-signal-safe operations allowed here
+    signal_received = signal;
+    stop_flag = true;
     
-    if (count == 0) {
-        std::cout << "\nReceived shutdown signal (" << signal << "). Gracefully shutting down hybrid crawler...\n";
-        stop_flag = true;
-        
-        // Give threads a chance to shut down gracefully
-        std::thread([]{
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-            if (stop_flag) {
-                std::cout << "Forcing shutdown after 5 seconds...\n";
-                std::quick_exit(0);
-            }
-        }).detach();
-    } else if (count == 1) {
-        std::cout << "\nSecond shutdown signal received. Force shutdown in 2 seconds...\n";
-        std::thread([]{
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-            std::cout << "Force shutdown now!\n";
-            std::quick_exit(1);
-        }).detach();
-    } else {
-        std::cout << "\nImmediate shutdown!\n";
-        std::quick_exit(2);
-    }
+    // Notify shutdown coordinator to begin coordinated shutdown
+    shutdown_coordinator_cv.notify_all();
 }

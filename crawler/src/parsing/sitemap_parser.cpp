@@ -1,167 +1,148 @@
 #include "sitemap_parser.h"
-// #include "utils.h"  // Commented out - no specific utils needed
-#include "config_loader.h"
 #include "http_client.h"
+#include "robots_txt_cache.h"
 #include "utility_functions.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <ctime>
 #include <iomanip>
+#include <thread>
 #include <tinyxml2.h>
 
 using namespace tinyxml2;
 
 namespace SitemapParsing {
 
-SitemapParser::SitemapParser(std::function<void(const std::vector<SitemapUrl>&)> callback, HttpClient* client)
-    : url_callback_(std::move(callback)), http_client_(client) {
+SitemapParser::SitemapParser(std::function<void(const std::vector<SitemapUrl>&)> callback, HttpClient* client, RobotsTxtCache* robots_cache)
+    : url_callback_(std::move(callback)), http_client_(client), robots_cache_(robots_cache) {
+    if (!robots_cache_) {
+        throw std::invalid_argument("RobotsTxtCache is required for SitemapParser");
+    }
 }
 
 SitemapParser::~SitemapParser() {
     shutdown_ = true;
+    
+    // Notify the worker thread to wake up and check shutdown flag
+    {
+        std::lock_guard<std::mutex> lock(shutdown_mutex_);
+        shutdown_cv_.notify_one();
+    }
+    
     if (parser_thread_.joinable()) {
         parser_thread_.join();
     }
 }
 
-bool SitemapParser::load_sitemaps_from_file(const std::string& sitemaps_file_path) {
-    std::ifstream file(sitemaps_file_path);
-    if (!file.is_open()) {
-        std::cerr << "Warning: Could not open sitemaps file: " << sitemaps_file_path << std::endl;
-        return false;
-    }
-    
-    std::lock_guard<std::mutex> lock(sitemaps_mutex_);
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#') continue; // Skip comments and empty lines
-        
-        // Format: sitemap_url parse_interval_hours
-        std::istringstream iss(line);
-        std::string sitemap_url;
-        int interval = 24; // Default
-        
-        iss >> sitemap_url >> interval;
-        if (!sitemap_url.empty()) {
-            SitemapInfo sitemap(sitemap_url);
-            sitemap.parse_interval_hours = interval;
-            sitemaps_.push_back(sitemap);
-        }
-    }
-    
-    std::cout << "Loaded " << sitemaps_.size() << " sitemaps from " << sitemaps_file_path << std::endl;
-    return true;
-}
-
-bool SitemapParser::load_sitemaps_from_json(const std::string& json_file_path) {
-    auto sitemap_configs = ConfigLoader::load_sitemap_configs(json_file_path);
-    if (sitemap_configs.empty()) {
-        std::cerr << "Warning: No sitemaps loaded from " << json_file_path << std::endl;
-        return false;
-    }
-    
-    std::lock_guard<std::mutex> lock(sitemaps_mutex_);
-    for (const auto& config : sitemap_configs) {
-        SitemapInfo sitemap(config.url);
-        sitemap.parse_interval_hours = 24; // Default interval
-        // Use priority as a hint for parsing frequency if needed
-        if (config.priority >= 9) {
-            sitemap.parse_interval_hours = 12; // High priority: parse twice daily
-        } else if (config.priority <= 6) {
-            sitemap.parse_interval_hours = 48; // Low priority: parse every 2 days
-        }
-        sitemaps_.push_back(sitemap);
-    }
-    
-    std::cout << "🗺️  Loaded " << sitemaps_.size() << " sitemaps from " << json_file_path << std::endl;
-    return true;
-}
-
-void SitemapParser::add_sitemap(const std::string& sitemap_url, int parse_interval_hours) {
-    std::lock_guard<std::mutex> lock(sitemaps_mutex_);
-    SitemapInfo sitemap(sitemap_url);
-    sitemap.parse_interval_hours = parse_interval_hours;
-    sitemaps_.push_back(sitemap);
-    std::cout << "Added sitemap: " << sitemap_url << std::endl;
-}
-
-void SitemapParser::auto_discover_sitemaps(const std::vector<std::string>& domains) {
+void SitemapParser::add_domains_to_monitor(const std::vector<std::string>& domains) {
+    std::lock_guard<std::mutex> lock(domains_mutex_);
     for (const auto& domain : domains) {
-        discover_sitemap_from_robots_txt(domain);
+        if (std::find(monitored_domains_.begin(), monitored_domains_.end(), domain) == monitored_domains_.end()) {
+            monitored_domains_.push_back(domain);
+            // std::cout << "🌐 Added domain to monitor: " << domain << std::endl;
+        }
     }
 }
 
-void SitemapParser::discover_sitemap_from_robots_txt(const std::string& domain) {
-    std::cout << "Checking robots.txt for sitemaps: " << domain << std::endl;
-    
-    if (!http_client_) {
-        std::cerr << "No HTTP client available for robots.txt discovery" << std::endl;
+
+void SitemapParser::refresh_sitemaps_from_robots_cache() {
+    // Early exit if shutdown was requested
+    if (shutdown_) {
         return;
     }
     
-    try {
-        auto response = http_client_->download_robots_txt(domain);
+    std::vector<std::string> domains_copy;
+    {
+        std::lock_guard<std::mutex> lock(domains_mutex_);
+        domains_copy = monitored_domains_;
+    }
+    
+    std::cout << "🔍 Refreshing sitemaps for " << domains_copy.size() << " monitored domains" << std::endl;
+    
+    for (const auto& domain : domains_copy) {
+        // Check shutdown flag during each domain processing
+        if (shutdown_) {
+            std::cout << "🛑 Sitemap refresh interrupted by shutdown request" << std::endl;
+            return;
+        }
         
-        if (!response.success || response.body.empty()) {
-            std::cout << "Could not retrieve robots.txt from " << domain << std::endl;
-        } else {
-            // Parse robots.txt for sitemap entries
-            std::istringstream stream(response.body);
-            std::string line;
+        // Get sitemaps from robots cache (with error handling)
+        std::vector<::SitemapInfo> cached_sitemaps;
+        try {
+            cached_sitemaps = robots_cache_->get_sitemaps_for_domain(domain);
+        } catch (const std::exception& e) {
+            std::cerr << "⚠️  ERROR: Failed to get sitemaps from robots cache for domain " << domain 
+                     << ": " << e.what() << std::endl;
+            continue; // Skip this domain and continue with others
+        } catch (...) {
+            std::cerr << "⚠️  ERROR: Unknown error getting sitemaps from robots cache for domain " << domain << std::endl;
+            continue; // Skip this domain and continue with others
+        }
+        
+        // std::cout << "📋 Domain " << domain << " has " << cached_sitemaps.size() << " cached sitemaps" << std::endl;
+        
+        if (cached_sitemaps.empty()) {
+            // No sitemaps in cache, robots.txt will be fetched by the crawler
+            // when it encounters this domain
+            // std::cout << "⚠️  No sitemaps in cache for domain: " << domain << std::endl;
+            continue;
+        }
+        
+        std::lock_guard<std::mutex> lock(sitemaps_mutex_);
+        for (const auto& cached_sitemap : cached_sitemaps) {
+            // Validate sitemap URL before processing
+            if (cached_sitemap.url.empty()) {
+                // std::cerr << "⚠️  WARNING: Empty sitemap URL found for domain " << domain << std::endl;
+                continue;
+            }
             
-            while (std::getline(stream, line)) {
-                // Convert to lowercase for comparison
-                std::string lower_line = line;
-                std::transform(lower_line.begin(), lower_line.end(), lower_line.begin(), ::tolower);
+            // Check if we already have this sitemap
+            bool already_exists = false;
+            for (const auto& existing : sitemaps_) {
+                if (existing.sitemap_url == cached_sitemap.url) {
+                    already_exists = true;
+                    break;
+                }
+            }
+            
+            if (!already_exists) {
+                // Double-check URL validation before creating SitemapInfo
+                if (cached_sitemap.url.empty()) {
+                    std::cerr << "⚠️  CRITICAL: Empty sitemap URL from robots cache for domain " << domain << ", skipping creation" << std::endl;
+                    continue;
+                }
                 
-                if (lower_line.find("sitemap:") == 0) {
-                    // Extract sitemap URL
-                    size_t url_start = line.find(':', 0) + 1;
-                    std::string sitemap_url = line.substr(url_start);
-                    
-                    // Trim whitespace
-                    sitemap_url.erase(0, sitemap_url.find_first_not_of(" \t"));
-                    sitemap_url.erase(sitemap_url.find_last_not_of(" \t\r\n") + 1);
-                    
-                    if (!sitemap_url.empty()) {
-                        add_sitemap(sitemap_url, 24); // Parse daily
-                        std::cout << "Discovered sitemap from robots.txt: " << sitemap_url << std::endl;
-                    }
+                if (cached_sitemap.url.find("http://") != 0 && cached_sitemap.url.find("https://") != 0) {
+                    std::cerr << "⚠️  CRITICAL: Invalid sitemap URL from robots cache: " << cached_sitemap.url << std::endl;
+                    continue;
                 }
+                
+                SitemapInfo sitemap(cached_sitemap.url, cached_sitemap.priority);
+                sitemap.parse_interval_hours = cached_sitemap.parse_interval_hours;
+                
+                // Final validation before adding to vector
+                if (!sitemap.enabled || sitemap.sitemap_url.empty()) {
+                    std::cerr << "⚠️  CRITICAL: Created SitemapInfo is invalid, not adding to vector" << std::endl;
+                    continue;
+                }
+                
+                sitemaps_.push_back(sitemap);
+                // std::cout << "🗺️  Added sitemap from robots cache: " << cached_sitemap.url 
+                //          << " (priority: " << cached_sitemap.priority << ")" << std::endl;
+            } else {
+                std::cout << "🔄 Sitemap already exists: " << cached_sitemap.url << std::endl;
             }
         }
-        
-        // Try common sitemap locations as fallback
-        std::vector<std::string> common_paths = {"/sitemap.xml", "/sitemap_index.xml", "/sitemaps.xml"};
-        for (const auto& path : common_paths) {
-            std::string test_url = domain;
-            if (test_url.find("://") == std::string::npos) {
-                test_url = "https://" + test_url;
-            }
-            if (test_url.back() != '/') {
-                test_url += "/";
-            }
-            test_url += path.substr(1); // Remove leading slash
-            
-            try {
-                auto test_response = http_client_->download_sitemap(test_url);
-                if (test_response.success && !test_response.body.empty() && 
-                    (test_response.body.find("<urlset") != std::string::npos || 
-                     test_response.body.find("<sitemapindex") != std::string::npos)) {
-                    std::cout << "Found sitemap at common location: " << test_url << std::endl;
-                    add_sitemap(test_url, 24); // Parse daily
-                }
-            } catch (...) {
-                // Ignore failures for common path tests
-            }
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Exception discovering sitemaps from robots.txt for " << domain << ": " << e.what() << std::endl;
     }
 }
 
 void SitemapParser::start_parsing() {
+    // Validate and recover from any corrupted cache state before starting
+    // if (!validate_and_recover_cache()) {
+    //     std::cout << "⚠️  WARNING: Cache validation failed, but continuing with limited functionality" << std::endl;
+    // }
+    
     parser_thread_ = std::thread(&SitemapParser::parser_worker, this);
     std::cout << "Sitemap parser started" << std::endl;
 }
@@ -187,42 +168,79 @@ void SitemapParser::stop() {
 void SitemapParser::parser_worker() {
     while (!shutdown_) {
         try {
+            // Check shutdown flag before expensive operations
+            if (shutdown_) {
+                break;
+            }
+            
+            // First, refresh sitemaps from robots cache
+            refresh_sitemaps_from_robots_cache();
+            
+            // Check shutdown flag again after DB operations
+            if (shutdown_) {
+                break;
+            }
+            
             std::vector<SitemapUrl> new_urls;
         
         {
             std::lock_guard<std::mutex> lock(sitemaps_mutex_);
+            std::vector<SitemapInfo> new_sitemaps_to_add; // Collect new sitemaps here
+            
             for (auto& sitemap : sitemaps_) {
+                // Check shutdown flag during sitemap processing
+                if (shutdown_) {
+                    std::cout << "🛑 Sitemap processing interrupted by shutdown request" << std::endl;
+                    return;
+                }
+                
+                if (!sitemap.enabled) {
+                    continue; // Skip disabled sitemaps
+                }
+                
                 if (sitemap.is_ready_for_parse()) {
                     // std::cout << "Parsing sitemap: " << sitemap.sitemap_url << std::endl;
                     
                     std::string content = download_sitemap(sitemap.sitemap_url);
                     if (!content.empty()) {
+                        // Check shutdown again after network operation
+                        if (shutdown_) {
+                            std::cout << "🛑 Sitemap download interrupted by shutdown request" << std::endl;
+                            return;
+                        }
+                        
                         // Check if this is a sitemap index
                         if (content.find("<sitemapindex") != std::string::npos) {
                             sitemap.is_index = true;
                             std::vector<std::string> child_sitemaps = parse_sitemap_index(content);
                             
-                            // Add child sitemaps to our list
-                            std::vector<SitemapInfo> new_child_sitemaps;
-
-for (const auto& child_url : child_sitemaps) {
-    bool already_exists = false;
-    for (const auto& existing : sitemaps_) {
-        if (existing.sitemap_url == child_url) {
-            already_exists = true;
-            break;
-        }
-    }
-    if (!already_exists) {
-        SitemapInfo child_sitemap(child_url);
-        child_sitemap.parse_interval_hours = sitemap.parse_interval_hours;
-        new_child_sitemaps.push_back(child_sitemap);
-        // std::cout << "Prepared child sitemap: " << child_url << std::endl;
-    }
-}
-
-sitemaps_.insert(sitemaps_.end(), new_child_sitemaps.begin(), new_child_sitemaps.end());
-
+                            // Collect child sitemaps to add after loop completes
+                            for (const auto& child_url : child_sitemaps) {
+                                // Validate child URL before processing
+                                if (child_url.empty()) {
+                                    std::cerr << "⚠️  WARNING: Empty child sitemap URL from index, skipping..." << std::endl;
+                                    continue;
+                                }
+                                
+                                if (child_url.find("http://") != 0 && child_url.find("https://") != 0) {
+                                    std::cerr << "⚠️  WARNING: Invalid child sitemap URL: " << child_url << std::endl;
+                                    continue;
+                                }
+                                
+                                bool already_exists = false;
+                                for (const auto& existing : sitemaps_) {
+                                    if (existing.sitemap_url == child_url) {
+                                        already_exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!already_exists) {
+                                    SitemapInfo child_sitemap(child_url);
+                                    child_sitemap.parse_interval_hours = sitemap.parse_interval_hours;
+                                    new_sitemaps_to_add.push_back(child_sitemap);
+                                    // std::cout << "Prepared child sitemap: " << child_url << std::endl;
+                                }
+                            }
                         } else {
                             // Regular sitemap
                             std::vector<SitemapUrl> urls = parse_sitemap_xml(content);
@@ -248,9 +266,15 @@ sitemaps_.insert(sitemaps_.end(), new_child_sitemaps.begin(), new_child_sitemaps
                         // std::cout << "Parsed sitemap successfully, found " << new_urls.size() << " new/updated URLs" << std::endl;
                     } else {
                         sitemap.record_failure();
-                        std::cout << "Failed to download sitemap: " << sitemap.sitemap_url << std::endl;
+                        // std::cout << "Failed to download sitemap: " << sitemap.sitemap_url << std::endl;
                     }
                 }
+            }
+            
+            // Now safely add all new sitemaps after iteration is complete
+            if (!new_sitemaps_to_add.empty()) {
+                sitemaps_.insert(sitemaps_.end(), new_sitemaps_to_add.begin(), new_sitemaps_to_add.end());
+                std::cout << "Added " << new_sitemaps_to_add.size() << " new child sitemaps for processing" << std::endl;
             }
         }
         
@@ -269,16 +293,31 @@ sitemaps_.insert(sitemaps_.end(), new_child_sitemaps.begin(), new_child_sitemaps
         std::unique_lock<std::mutex> lock(shutdown_mutex_);
         if (!shutdown_cv_.wait_for(lock, std::chrono::hours(1), [this] { return shutdown_.load(); })) {
             // Timeout occurred (1 hour passed), continue with next iteration
+            if (shutdown_) {
+                break; // Double-check shutdown flag after timeout
+            }
         }
         // If shutdown flag is set, the loop will exit on next iteration
         
         } catch (const std::exception& e) {
             std::cerr << "Error in sitemap parser worker: " << e.what() << std::endl;
+            
+            // Check shutdown before retrying
+            if (shutdown_) {
+                break;
+            }
+            
             // Short sleep before retry, but allow immediate shutdown
             std::unique_lock<std::mutex> lock(shutdown_mutex_);
             shutdown_cv_.wait_for(lock, std::chrono::seconds(10), [this] { return shutdown_.load(); });
         } catch (...) {
             std::cerr << "Unknown error in sitemap parser worker" << std::endl;
+            
+            // Check shutdown before retrying
+            if (shutdown_) {
+                break;
+            }
+            
             // Short sleep before retry, but allow immediate shutdown
             std::unique_lock<std::mutex> lock(shutdown_mutex_);
             shutdown_cv_.wait_for(lock, std::chrono::seconds(10), [this] { return shutdown_.load(); });
@@ -286,11 +325,19 @@ sitemaps_.insert(sitemaps_.end(), new_child_sitemaps.begin(), new_child_sitemaps
     }
 }
 
-} // namespace SitemapParsing
-
-namespace SitemapParsing {
-
 std::string SitemapParser::download_sitemap(const std::string& sitemap_url) {
+    // Validate URL is not empty
+    if (sitemap_url.empty()) {
+        std::cerr << "Error: Empty sitemap URL provided to download_sitemap" << std::endl;
+        return "";
+    }
+    
+    // Basic URL validation
+    if (sitemap_url.find("http://") != 0 && sitemap_url.find("https://") != 0) {
+        std::cerr << "Error: Invalid sitemap URL (missing protocol): " << sitemap_url << std::endl;
+        return "";
+    }
+    
     if (!http_client_) {
         std::cerr << "No HTTP client available for sitemap download: " << sitemap_url << std::endl;
         return "";
@@ -303,15 +350,15 @@ std::string SitemapParser::download_sitemap(const std::string& sitemap_url) {
         
         // Check for cURL-level errors first (e.g., connection timed out)
         if (!response.success) {
-            std::cerr << "Failed to download sitemap " << sitemap_url << " (cURL Error): " 
-                      << HttpClient::curl_error_string(response.curl_code) << std::endl;
+            // std::cerr << "Failed to download sitemap " << sitemap_url << " (cURL Error): " 
+            //           << HttpClient::curl_error_string(response.curl_code) << std::endl;
             return "";
         }
         
         // Check for HTTP-level errors (e.g., 404 Not Found, 403 Forbidden)
         if (response.headers.status_code != 200) {
-            std::cerr << "Failed to download sitemap " << sitemap_url 
-                      << " (HTTP Status: " << response.headers.status_code << ")" << std::endl;
+            // std::cerr << "Failed to download sitemap " << sitemap_url 
+            //           << " (HTTP Status: " << response.headers.status_code << ")" << std::endl;
             return "";
         }
         
@@ -433,24 +480,91 @@ size_t SitemapParser::get_active_sitemaps_count() const {
 }
 
 void SitemapParser::print_sitemap_stats() const {
-    std::lock_guard<std::mutex> lock(sitemaps_mutex_);
-    std::cout << "\n=== Sitemap Parser Statistics ===" << std::endl;
-    std::cout << "Total sitemaps: " << sitemaps_.size() << std::endl;
-    std::cout << "Active sitemaps: " << get_active_sitemaps_count() << std::endl;
+    size_t total_sitemaps;
+    size_t active_sitemaps;
+    size_t discovered_urls_count;
+    std::vector<SitemapInfo> sitemap_copy;
+    
+    // Get all data while holding locks, then print without locks
+    {
+        std::lock_guard<std::mutex> lock(sitemaps_mutex_);
+        total_sitemaps = sitemaps_.size();
+        active_sitemaps = std::count_if(sitemaps_.begin(), sitemaps_.end(), 
+                                      [](const SitemapInfo& sitemap) { return sitemap.enabled; });
+        sitemap_copy = sitemaps_; // Copy for printing later
+    }
     
     {
         std::lock_guard<std::mutex> disc_lock(discovered_mutex_);
-        std::cout << "Discovered URLs: " << discovered_urls_.size() << std::endl;
+        discovered_urls_count = discovered_urls_.size();
     }
     
-    for (const auto& sitemap : sitemaps_) {
-        std::cout << "Sitemap: " << sitemap.sitemap_url 
-                  << " | Interval: " << sitemap.parse_interval_hours << "h"
-                  << " | Failures: " << sitemap.consecutive_failures
-                  << " | Index: " << (sitemap.is_index ? "Yes" : "No")
-                  << " | Enabled: " << (sitemap.enabled ? "Yes" : "No") << std::endl;
-    }
+    // Now print without holding any locks
+    std::cout << "\n=== Sitemap Parser Statistics ===" << std::endl;
+    std::cout << "Total sitemaps: " << total_sitemaps << std::endl;
+    std::cout << "Active sitemaps: " << active_sitemaps << std::endl;
+    std::cout << "Discovered URLs: " << discovered_urls_count << std::endl;
+    
+    // for (const auto& sitemap : sitemap_copy) {
+    //     std::cout << "Sitemap: " << sitemap.sitemap_url 
+    //               << " | Interval: " << sitemap.parse_interval_hours << "h"
+    //               << " | Failures: " << sitemap.consecutive_failures
+    //               << " | Index: " << (sitemap.is_index ? "Yes" : "No")
+    //               << " | Enabled: " << (sitemap.enabled ? "Yes" : "No") << std::endl;
+    // }
     std::cout << "==================================\n" << std::endl;
+}
+
+bool SitemapParser::validate_and_recover_cache() {
+    std::cout << "🔍 Validating sitemap cache integrity..." << std::endl;
+    
+    // Get a sample of domains to test cache health
+    std::vector<std::string> test_domains;
+    {
+        std::lock_guard<std::mutex> lock(domains_mutex_);
+        // Test up to 3 domains to avoid slow startup
+        size_t test_count = std::min(static_cast<size_t>(3), monitored_domains_.size());
+        for (size_t i = 0; i < test_count; ++i) {
+            test_domains.push_back(monitored_domains_[i]);
+        }
+    }
+    
+    bool cache_healthy = true;
+    size_t successful_tests = 0;
+    
+    for (const auto& domain : test_domains) {
+        try {
+            // Test if we can read from the robots cache without exceptions
+            auto sitemaps = robots_cache_->get_sitemaps_for_domain(domain);
+            successful_tests++;
+            
+            // Log the test result
+            std::cout << "✅ Cache test passed for domain: " << domain 
+                     << " (" << sitemaps.size() << " sitemaps)" << std::endl;
+                     
+        } catch (const std::exception& e) {
+            std::cerr << "❌ Cache test failed for domain " << domain << ": " << e.what() << std::endl;
+            cache_healthy = false;
+        } catch (...) {
+            std::cerr << "❌ Cache test failed for domain " << domain << ": Unknown error" << std::endl;
+            cache_healthy = false;
+        }
+        
+        // Avoid spamming during startup
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    if (cache_healthy && successful_tests > 0) {
+        std::cout << "✅ Cache validation passed (" << successful_tests << "/" << test_domains.size() << " tests successful)" << std::endl;
+        return true;
+    } else if (successful_tests == 0 && !test_domains.empty()) {
+        std::cout << "⚠️  WARNING: All cache tests failed - cache may be corrupted. Continuing with degraded performance." << std::endl;
+        std::cout << "💡 TIP: If problems persist, clear the cache directory and restart the crawler" << std::endl;
+        return false;
+    } else {
+        std::cout << "✅ Cache validation completed with partial success (" << successful_tests << "/" << test_domains.size() << " tests)" << std::endl;
+        return true;
+    }
 }
 
 } // namespace SitemapParsing

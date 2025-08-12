@@ -1,9 +1,10 @@
 #include "html_processing_queue.h"
+#include "constants.h"
 
 bool HtmlProcessingQueue::enqueue(HtmlProcessingTask&& task) {
     std::unique_lock<std::mutex> lock(mutex_);
     
-    if (queue_.size() >= MAX_QUEUE_SIZE) {
+    if (queue_.size() >= CrawlerConstants::Queue::HTML_QUEUE_SIZE) {
         return false;  // Queue full
     }
     
@@ -15,7 +16,13 @@ bool HtmlProcessingQueue::enqueue(HtmlProcessingTask&& task) {
 bool HtmlProcessingQueue::dequeue(HtmlProcessingTask& task) {
     std::unique_lock<std::mutex> lock(mutex_);
     
-    cv_.wait(lock, [this] { return !queue_.empty() || shutdown_.load(); });
+    cv_.wait(lock, [this] { 
+        return !queue_.empty() || shutdown_.load() || interrupt_flag_.load(); 
+    });
+    
+    if (interrupt_flag_.load() || shutdown_.load()) {
+        return false;  // Shutdown or interrupt
+    }
     
     if (queue_.empty()) {
         return false;  // Shutdown
@@ -28,6 +35,11 @@ bool HtmlProcessingQueue::dequeue(HtmlProcessingTask& task) {
 
 void HtmlProcessingQueue::shutdown() {
     shutdown_.store(true);
+    cv_.notify_all();
+}
+
+void HtmlProcessingQueue::interrupt_waits() {
+    interrupt_flag_.store(true);
     cv_.notify_all();
 }
 

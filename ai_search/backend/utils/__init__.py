@@ -2,6 +2,28 @@
 Utils Package - Backend utility functions
 """
 
-from .helpers import ResponseFormatter, QueryProcessor, ResultProcessor, PerformanceTracker
+from .helpers import (
+    Logger,
+    ConfigManager,
+    PerformanceMonitor,
+    ResponseFormatter,
+    QueryProcessor,
+    ResultProcessor,
+    TextProcessor,
+    HealthChecker,
+    PerformanceTracker,
+    performance_tracker
+)
 
-__all__ = ['ResponseFormatter', 'QueryProcessor', 'ResultProcessor', 'PerformanceTracker']
+__all__ = [
+    'Logger',
+    'ConfigManager',
+    'PerformanceMonitor',
+    'ResponseFormatter',
+    'QueryProcessor',
+    'ResultProcessor',
+    'TextProcessor',
+    'HealthChecker',
+    'PerformanceTracker',
+    'performance_tracker'
+]

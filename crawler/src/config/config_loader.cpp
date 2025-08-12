@@ -42,21 +42,6 @@ std::vector<FeedConfig> load_feed_configs(const std::string& config_path) {
     return feeds;
 }
 
-std::vector<SitemapConfig> load_sitemap_configs(const std::string& config_path) {
-    std::ifstream file(config_path);
-    if (!file.is_open()) {
-        std::cerr << "Warning: Could not open sitemaps config file: " << config_path << std::endl;
-        return {};
-    }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string content = buffer.str();
-    
-    auto sitemaps = JsonParser::parse_sitemap_array(content);
-    std::cout << "✅ Loaded " << sitemaps.size() << " sitemaps from " << config_path << std::endl;
-    return sitemaps;
-}
 
 namespace JsonParser {
 
@@ -122,23 +107,6 @@ std::vector<FeedConfig> parse_feed_array(const std::string& json_content) {
     return result;
 }
 
-std::vector<SitemapConfig> parse_sitemap_array(const std::string& json_content) {
-    std::vector<SitemapConfig> result;
-    try {
-        json sitemap_array = json::parse(json_content);
-
-        for (const auto& entry : sitemap_array) {
-            if (!entry.contains("url")) continue;
-            std::string url = entry["url"];
-            int priority = entry.value("priority", 5);           // default priority = 5
-            int interval = entry.value("parse_interval", 24);    // default = 24 hours
-            result.emplace_back(url, interval, priority);
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "[ERROR] Failed to parse sitemaps.json: " << e.what() << std::endl;
-    }
-    return result;
-}
 
 } // namespace JsonParser
 } // namespace ConfigLoader

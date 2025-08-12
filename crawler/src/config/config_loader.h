@@ -48,11 +48,6 @@ std::vector<std::string> load_seed_urls(const std::string& config_path);
 std::vector<FeedConfig> load_feed_configs(const std::string& config_path);
 
 /**
- * Load sitemap configurations from JSON file
- */
-std::vector<SitemapConfig> load_sitemap_configs(const std::string& config_path);
-
-/**
  * Simple JSON parser for our specific formats
  * Supports comments (lines starting with // or #)
  */
@@ -60,7 +55,6 @@ namespace JsonParser {
     std::string remove_comments(const std::string& json_content);
     std::vector<std::string> parse_string_array(const std::string& json_content);
     std::vector<FeedConfig> parse_feed_array(const std::string& json_content);
-    std::vector<SitemapConfig> parse_sitemap_array(const std::string& json_content);
 }
 
 } // namespace ConfigLoader

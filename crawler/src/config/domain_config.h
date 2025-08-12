@@ -1,15 +1,16 @@
 #pragma once
 
-#include "snippet_extractor.h"
 #include <string>
 #include <unordered_map>
 #include <chrono>
 #include <memory>
 #include <fstream>
+#include <vector>
+
 
 /**
  * 🧡 PER-DOMAIN CONFIGURATION SUPPORT
- * Domain-specific crawling and snippet extraction rules
+ * Domain-specific crawling   rules
  */
 
 namespace DomainConfiguration {
@@ -27,8 +28,6 @@ struct DomainConfig {
     // Crawling configuration
     CrawlFrequencyConfig crawl_frequency;
     
-    // Snippet extraction configuration
-    SnippetExtraction::SnippetConfig snippet_config;
     
     // Language filtering
     std::vector<std::string> language_whitelist; // Empty = allow all
@@ -58,7 +57,6 @@ private:
     
     // Configuration parsing helpers
     CrawlFrequencyConfig parse_crawl_frequency(const std::string& config_section);
-    SnippetExtraction::SnippetConfig parse_snippet_config(const std::string& config_section);
     
 public:
     DomainConfigManager();

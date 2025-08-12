@@ -53,20 +53,3 @@ size_t DomainBlacklist::size() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return blacklist_.size() + permanent_blacklist_.size();
 }
-
-void DomainBlacklist::load_from_file(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Warning: Could not open blacklist file: " << filename << std::endl;
-        return;
-    }
-    
-    std::string domain;
-    while (std::getline(file, domain)) {
-        if (!domain.empty() && domain[0] != '#') {  // Skip comments
-            add_permanent(domain);
-        }
-    }
-    
-    std::cout << "Loaded " << permanent_blacklist_.size() << " domains from blacklist file" << std::endl;
-}

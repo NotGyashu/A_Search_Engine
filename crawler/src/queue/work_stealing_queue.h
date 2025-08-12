@@ -17,7 +17,7 @@ private:
         std::deque<UrlInfo> local_queue;
         std::mutex mutex;
         std::atomic<size_t> size{0};
-        size_t max_size = CrawlerConstants::Queue::DEFAULT_WORK_STEALING_QUEUE_SIZE; // Max URLs per worker queue
+        size_t max_size = CrawlerConstants::Queue::MAX_WORK_STEALING_QUEUE_SIZE; // Max URLs per worker queue
     };
     
     std::vector<std::unique_ptr<WorkerQueue>> worker_queues_;
@@ -27,7 +27,7 @@ private:
     const size_t max_total_size_;
 
 public:
-    explicit WorkStealingQueue(size_t num_workers, size_t max_per_worker = CrawlerConstants::Queue::DEFAULT_WORK_STEALING_QUEUE_SIZE);
+    explicit WorkStealingQueue(size_t num_workers, size_t max_per_worker = CrawlerConstants::Queue::MAX_WORK_STEALING_QUEUE_SIZE);
     ~WorkStealingQueue() = default;
     
     bool push_local(size_t worker_id, const UrlInfo& url);

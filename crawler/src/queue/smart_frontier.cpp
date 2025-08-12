@@ -1,18 +1,42 @@
 #include "smart_frontier.h"
 
+// Time conversion utilities for system_clock <-> steady_clock
+// This allows us to use steady_clock for scheduling while keeping system_clock for persistence
+class TimeConverter {
+private:
+    static const std::chrono::system_clock::time_point system_base;
+    static const std::chrono::steady_clock::time_point steady_base;
+    
+public:
+    static std::chrono::steady_clock::time_point to_steady(const std::chrono::system_clock::time_point& sys_time) {
+        auto duration_since_base = sys_time - system_base;
+        return steady_base + duration_since_base;
+    }
+    
+    static std::chrono::system_clock::time_point to_system(const std::chrono::steady_clock::time_point& steady_time) {
+        auto duration_since_base = steady_time - steady_base;
+        return system_base + duration_since_base;
+    }
+};
+
+// Initialize static members
+const std::chrono::system_clock::time_point TimeConverter::system_base = std::chrono::system_clock::now();
+const std::chrono::steady_clock::time_point TimeConverter::steady_base = std::chrono::steady_clock::now();
+
 namespace CrawlScheduling {
+
 
 // SmartUrlInfo implementation
 SmartUrlInfo::SmartUrlInfo(const std::string& u, float p, int d, const std::string& ref)
     : url(u), priority(p), depth(d), referring_domain(ref), 
       discovered_time(std::chrono::steady_clock::now()),
-      expected_crawl_time(std::chrono::system_clock::now()) {}
+      expected_crawl_time(std::chrono::steady_clock::now()) {}
 
 SmartUrlInfo::SmartUrlInfo(const UrlInfo& url_info)
     : url(url_info.url), priority(url_info.priority), depth(url_info.depth),
       referring_domain(url_info.referring_domain), 
       discovered_time(url_info.discovered_time),
-      expected_crawl_time(std::chrono::system_clock::now()) {}
+      expected_crawl_time(std::chrono::steady_clock::now()) {}
 
 UrlInfo SmartUrlInfo::to_url_info() const {
     return UrlInfo(url, priority, depth, referring_domain);
@@ -20,7 +44,7 @@ UrlInfo SmartUrlInfo::to_url_info() const {
 
 // Priority comparator implementation
 bool SmartUrlPriorityComparator::operator()(const SmartUrlInfo& a, const SmartUrlInfo& b) const {
-    auto now = std::chrono::system_clock::now();
+    auto now = std::chrono::steady_clock::now();
     bool a_ready = a.expected_crawl_time <= now;
     bool b_ready = b.expected_crawl_time <= now;
     
@@ -71,12 +95,24 @@ bool SmartUrlFrontier::enqueue(const UrlInfo& url_info) {
     
     auto* metadata = metadata_store_->get_or_create_metadata(url_info.url);
     SmartUrlInfo smart_url(url_info);
-    smart_url.expected_crawl_time = metadata->expected_next_crawl;
-    smart_url.priority = metadata->calculate_priority();
+    
+    // ✅ FIX: For seed URLs (depth 0) or fresh URLs, force immediate crawling
+    if (url_info.depth == 0 || metadata->crawl_count == 0) {
+        smart_url.expected_crawl_time = std::chrono::steady_clock::now();
+        smart_url.priority = 1.0f; // High priority for seed/fresh URLs
+    } else {
+        smart_url.expected_crawl_time = TimeConverter::to_steady(metadata->expected_next_crawl);
+        smart_url.priority = metadata->calculate_priority();
+    }
     
     partition.queue_.push(smart_url);
     partition.seen_urls_.insert(url_info.url);
     partition.size_++;
+    
+    // Mark partition as ready if this URL is ready to crawl now
+    if (smart_url.expected_crawl_time <= std::chrono::steady_clock::now()) {
+        mark_partition_ready(partition_idx);
+    }
     
     return true;
 }
@@ -107,6 +143,9 @@ std::vector<UrlInfo> SmartUrlFrontier::enqueue_batch(std::vector<UrlInfo> batch)
 
         auto& partition = partitions_[i];
         std::lock_guard<std::mutex> lock(partition.mutex_);
+        
+        bool had_ready_urls = false;
+        auto now = std::chrono::steady_clock::now();
 
         for (const auto& url_info : partitioned_batch[i]) {
             if (total_size >= max_queue_size_.load()) {
@@ -119,13 +158,30 @@ std::vector<UrlInfo> SmartUrlFrontier::enqueue_batch(std::vector<UrlInfo> batch)
                 
                 auto* metadata = metadata_store_->get_or_create_metadata(url_info.url);
                 SmartUrlInfo smart_url(url_info);
-                smart_url.expected_crawl_time = metadata->expected_next_crawl;
-                smart_url.priority = metadata->calculate_priority();
+                
+                // ✅ FIX: For seed URLs (depth 0) or fresh URLs, force immediate crawling
+                if (url_info.depth == 0 || metadata->crawl_count == 0) {
+                    smart_url.expected_crawl_time = now;
+                    smart_url.priority = 1.0f; // High priority for seed/fresh URLs
+                } else {
+                    smart_url.expected_crawl_time = TimeConverter::to_steady(metadata->expected_next_crawl);
+                    smart_url.priority = metadata->calculate_priority();
+                }
                 
                 partition.queue_.push(std::move(smart_url));
                 partition.size_++;
                 total_size++;
+                
+                // Check if this URL is ready to crawl now
+                if (smart_url.expected_crawl_time <= now) {
+                    had_ready_urls = true;
+                }
             }
+        }
+        
+        // If we added ready URLs, mark partition as ready
+        if (had_ready_urls) {
+            mark_partition_ready(i);
         }
     }
 
@@ -159,60 +215,120 @@ bool SmartUrlFrontier::enqueue_smart(const SmartUrlInfo& smart_url) {
     partition.seen_urls_.insert(smart_url.url);
     partition.size_++;
     
+    // NEW: Update ready partition tracking when enqueueing
+    if (smart_url.expected_crawl_time <= std::chrono::steady_clock::now()) {
+        mark_partition_ready(partition_idx);
+    }
+    
     return true;
 }
 
+// NEW: High-performance ready partition management methods
+void SmartUrlFrontier::mark_partition_ready(size_t partition_idx) {
+    auto& partition = partitions_[partition_idx];
+    bool was_ready = partition.has_ready_urls_.exchange(true, std::memory_order_relaxed);
+    if (!was_ready) {
+        ready_partitions_.enqueue(partition_idx);
+        ready_partition_count_.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+void SmartUrlFrontier::mark_partition_not_ready(size_t partition_idx) {
+    auto& partition = partitions_[partition_idx];
+    bool was_ready = partition.has_ready_urls_.exchange(false, std::memory_order_relaxed);
+    if (was_ready) {
+        ready_partition_count_.fetch_sub(1, std::memory_order_relaxed);
+    }
+}
+
+bool SmartUrlFrontier::check_and_update_ready_status(size_t partition_idx) {
+    auto& partition = partitions_[partition_idx];
+    std::lock_guard<std::mutex> lock(partition.mutex_);
+    
+    if (partition.queue_.empty()) {
+        mark_partition_not_ready(partition_idx);
+        return false;
+    }
+    
+    bool has_ready = partition.queue_.top().expected_crawl_time <= std::chrono::steady_clock::now();
+    if (has_ready) {
+        mark_partition_ready(partition_idx);
+    } else {
+        mark_partition_not_ready(partition_idx);
+    }
+    return has_ready;
+}
+
 bool SmartUrlFrontier::dequeue(UrlInfo& url_info) {
-    size_t start_partition = round_robin_counter_.fetch_add(1) % NUM_PARTITIONS;
-    
-    // First pass: look for ready URLs
-    for (size_t i = 0; i < NUM_PARTITIONS; ++i) {
-        size_t partition_idx = (start_partition + i) % NUM_PARTITIONS;
-        auto& partition = partitions_[partition_idx];
-        
-        std::lock_guard<std::mutex> lock(partition.mutex_);
-        
-        if (partition.queue_.empty()) continue;
-        
-        const auto& top = partition.queue_.top();
-        if (top.expected_crawl_time <= std::chrono::system_clock::now()) {
-            url_info = top.to_url_info();
-            partition.queue_.pop();
-            partition.size_--;
-            return true;
-        }
-    }
-    
-    // Second pass: earliest scheduled URL
-    SmartUrlInfo earliest_url("", 0.0f);
-    size_t earliest_partition = 0;
-    bool found_any = false;
-    
-    for (size_t i = 0; i < NUM_PARTITIONS; ++i) {
-        size_t partition_idx = (start_partition + i) % NUM_PARTITIONS;
-        auto& partition = partitions_[partition_idx];
-        
-        std::lock_guard<std::mutex> lock(partition.mutex_);
-        
-        if (partition.queue_.empty()) continue;
-        
-        const auto& top = partition.queue_.top();
-        if (!found_any || top.expected_crawl_time < earliest_url.expected_crawl_time) {
-            earliest_url = top;
-            earliest_partition = partition_idx;
-            found_any = true;
-        }
-    }
-    
-    if (found_any) {
-        auto& partition = partitions_[earliest_partition];
+    // NEW: Ultra-fast ready partition check (O(1) instead of O(N))
+    size_t ready_partition_idx;
+    if (ready_partitions_.try_dequeue(ready_partition_idx)) {
+        auto& partition = partitions_[ready_partition_idx];
         std::lock_guard<std::mutex> lock(partition.mutex_);
         
         if (!partition.queue_.empty()) {
-            url_info = partition.queue_.top().to_url_info();
-            partition.queue_.pop();
-            partition.size_--;
-            return true;
+            const auto& top = partition.queue_.top();
+            if (top.expected_crawl_time <= std::chrono::steady_clock::now()) {
+                url_info = top.to_url_info();
+                partition.queue_.pop();
+                partition.size_--;
+                
+                // Check if partition still has ready URLs, re-queue if so
+                if (!partition.queue_.empty() && 
+                    partition.queue_.top().expected_crawl_time <= std::chrono::steady_clock::now()) {
+                    ready_partitions_.enqueue(ready_partition_idx);
+                } else {
+                    mark_partition_not_ready(ready_partition_idx);
+                }
+                return true;
+            }
+        }
+        
+        // Partition no longer ready, mark as such
+        mark_partition_not_ready(ready_partition_idx);
+    }
+    
+    // Fallback: If no ready partitions, do a quick scan to find and register ready partitions
+    if (ready_partition_count_.load(std::memory_order_relaxed) == 0) {
+        auto now = std::chrono::steady_clock::now();
+        size_t start_partition = round_robin_counter_.fetch_add(1) % NUM_PARTITIONS;
+        
+        for (size_t i = 0; i < NUM_PARTITIONS; ++i) {
+            size_t partition_idx = (start_partition + i) % NUM_PARTITIONS;
+            auto& partition = partitions_[partition_idx];
+            
+            // Quick check without lock if partition might have ready URLs
+            if (partition.size_.load(std::memory_order_relaxed) == 0) continue;
+            
+            std::lock_guard<std::mutex> lock(partition.mutex_);
+            if (!partition.queue_.empty() && 
+                partition.queue_.top().expected_crawl_time <= now) {
+                mark_partition_ready(partition_idx);
+            }
+        }
+        
+        // Try again after discovery
+        if (ready_partitions_.try_dequeue(ready_partition_idx)) {
+            auto& partition = partitions_[ready_partition_idx];
+            std::lock_guard<std::mutex> lock(partition.mutex_);
+            
+            if (!partition.queue_.empty() && 
+                partition.queue_.top().expected_crawl_time <= std::chrono::steady_clock::now()) {
+                url_info = partition.queue_.top().to_url_info();
+                partition.queue_.pop();
+                partition.size_--;
+                
+                // Check if partition still has ready URLs
+                if (!partition.queue_.empty() && 
+                    partition.queue_.top().expected_crawl_time <= std::chrono::steady_clock::now()) {
+                    ready_partitions_.enqueue(ready_partition_idx);
+                } else {
+                    mark_partition_not_ready(ready_partition_idx);
+                }
+                return true;
+            } else {
+                mark_partition_not_ready(ready_partition_idx);
+            }
         }
     }
     
@@ -221,7 +337,7 @@ bool SmartUrlFrontier::dequeue(UrlInfo& url_info) {
 
 std::vector<UrlInfo> SmartUrlFrontier::get_ready_urls(size_t max_count) {
     std::vector<UrlInfo> ready_urls;
-    auto now = std::chrono::system_clock::now();
+    auto now = std::chrono::steady_clock::now();
     
     for (auto& partition : partitions_) {
         std::lock_guard<std::mutex> lock(partition.mutex_);
@@ -286,7 +402,7 @@ void SmartUrlFrontier::set_max_depth(int depth) {
 
 size_t SmartUrlFrontier::count_ready_urls() const {
     size_t total_count = 0;
-    auto now = std::chrono::system_clock::now();
+    auto now = std::chrono::steady_clock::now();
     
     for (const auto& partition : partitions_) {
         std::lock_guard<std::mutex> lock(partition.mutex_);

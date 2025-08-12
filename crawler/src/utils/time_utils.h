@@ -54,6 +54,18 @@ inline std::string current_timestamp() {
 }
 
 /**
+ * Get current date string
+ * Format: YYYY-MM-DD
+ */
+inline std::string current_date_string() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t time_t_val = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t_val), "%Y-%m-%d");
+    return ss.str();
+}
+
+/**
  * Format duration for human-readable output
  */
 inline std::string format_duration(const std::chrono::milliseconds& duration) {

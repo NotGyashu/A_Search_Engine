@@ -19,10 +19,8 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <re2/re2.h>
 
-#if HAVE_HYPERSCAN
-#include <hs/hs.h>
-#endif
 
 namespace UltraParser {
 
@@ -32,11 +30,6 @@ class SIMDPrefilter {
 private:
     static constexpr size_t CHUNK_SIZE = CrawlerConstants::SIMD::CHUNK_SIZE; // AVX2 256-bit chunks
     
-#if HAVE_HYPERSCAN
-    hs_database_t* noise_filter_db_ = nullptr;
-    hs_scratch_t* scratch_ = nullptr;
-#endif
-
 public:
     SIMDPrefilter();
     ~SIMDPrefilter();
@@ -46,7 +39,7 @@ public:
     
     // Remove <script>, <style>, comments using SIMD + Hyperscan
     std::string_view filter_noise(const char* data, size_t len, char* output_buffer) const;
-    
+    std::vector<std::unique_ptr<re2::RE2>> noise_patterns_;
     // Quick link density check
     size_t estimate_link_count(const char* data, size_t len) const;
     
@@ -172,7 +165,7 @@ private:
 class UltraHTMLParser {
 private:
     SIMDPrefilter prefilter_;
-    thread_local static UltraLinkExtractor* t_extractor_;
+    thread_local static std::unique_ptr<UltraLinkExtractor> t_extractor_;
     thread_local static std::vector<char> t_filter_buffer_;
 
 public:

@@ -19,6 +19,13 @@ RSSAtomPoller::RSSAtomPoller(std::function<void(const std::vector<FeedEntry>&)> 
 
 RSSAtomPoller::~RSSAtomPoller() {
     shutdown_ = true;
+    
+    // Notify the worker thread to wake up and check shutdown flag
+    {
+        std::lock_guard<std::mutex> lock(shutdown_mutex_);
+        shutdown_cv_.notify_one();
+    }
+    
     if (poller_thread_.joinable()) {
         poller_thread_.join();
     }
@@ -123,41 +130,52 @@ void RSSAtomPoller::poller_worker() {
                 std::lock_guard<std::mutex> lock(feeds_mutex_);
                 for (auto& feed : feeds_) {
                     if (feed.is_ready_for_poll()) {
-                        std::cout << "Polling feed: " << feed.feed_url << std::endl;
-                        
-                        std::string content = download_feed(feed.feed_url);
-                        if (!content.empty()) {
-                            // Try RSS first, then Atom
-                            std::vector<FeedEntry> entries = parse_rss_feed(content);
-                            if (entries.empty()) {
-                                entries = parse_atom_feed(content);
-                            }
-                            
-                            // Filter for recent entries and count per feed
-                            int recent_count_this_feed = 0;
-                            int filtered_count_this_feed = 0;
-                            for (const auto& entry : entries) {
-                                // For fresh mode, use a more lenient time threshold (48 hours instead of 24)
-                                bool is_recent = is_recent_entry(entry.pub_date, 48);
-                                if (is_recent) {
-                                    new_entries.push_back(entry);
-                                    recent_count_this_feed++;
-                                } else {
-                                    filtered_count_this_feed++;
+                        try {
+                            std::string content = download_feed(feed.feed_url);
+                            if (!content.empty()) {
+                                // Try RSS first, then Atom
+                                std::vector<FeedEntry> entries = parse_rss_feed(content);
+                                if (entries.empty()) {
+                                    entries = parse_atom_feed(content);
                                 }
+                                
+                                // Filter for recent entries and count per feed
+                                int recent_count_this_feed = 0;
+                                int filtered_count_this_feed = 0;
+                                for (const auto& entry : entries) {
+                                    // For fresh mode, use a more lenient time threshold (48 hours instead of 24)
+                                    bool is_recent = is_recent_entry(entry.pub_date, 48);
+                                    if (is_recent) {
+                                        new_entries.push_back(entry);
+                                        recent_count_this_feed++;
+                                    } else {
+                                        filtered_count_this_feed++;
+                                    }
+                                }
+                                
+                                // if (filtered_count_this_feed > 0) {
+                                //     std::cout << "🕒 Filtered out " << filtered_count_this_feed 
+                                //              << " older entries (>48h)" << std::endl;
+                                // }
+                                
+                                feed.record_success();
+                                // std::cout << "Found " << entries.size() << " entries in feed, " 
+                                //           << recent_count_this_feed << " are recent" << std::endl;
+                            } else {
+                                feed.record_failure();
+                                // std::cout << "Failed to download feed: " << feed.feed_url << std::endl;
                             }
-                            
-                            if (filtered_count_this_feed > 0) {
-                                std::cout << "🕒 Filtered out " << filtered_count_this_feed 
-                                         << " older entries (>48h)" << std::endl;
-                            }
-                            
-                            feed.record_success();
-                            std::cout << "Found " << entries.size() << " entries in feed, " 
-                                      << recent_count_this_feed << " are recent" << std::endl;
-                        } else {
+                        } catch (const std::exception& e) {
                             feed.record_failure();
-                            std::cout << "Failed to download feed: " << feed.feed_url << std::endl;
+                            std::cerr << "❌ Exception while processing feed " << feed.feed_url 
+                                     << ": " << e.what() << std::endl;
+                        } catch (...) {
+                            feed.record_failure();
+                            std::cerr << "❌ Unknown exception while processing feed " << feed.feed_url << std::endl;
+                        }
+                        
+                        if (shutdown_.load()) {
+                            break;
                         }
                     }
                 }
@@ -165,12 +183,12 @@ void RSSAtomPoller::poller_worker() {
             
             // Forward new URLs to crawler
             if (!new_entries.empty() && url_callback_) {
-                std::cout << "📡 RSS Poller: Forwarding " << new_entries.size() 
-                         << " total recent URLs to crawler callback..." << std::endl;
+                // std::cout << "📡 RSS Poller: Forwarding " << new_entries.size() 
+                //          << " total recent URLs to crawler callback..." << std::endl;
                 try {
                     url_callback_(new_entries);
-                    std::cout << "✅ RSS Poller: Successfully called callback with " 
-                             << new_entries.size() << " URLs" << std::endl;
+                    // std::cout << "✅ RSS Poller: Successfully called callback with " 
+                    //          << new_entries.size() << " URLs" << std::endl;
                 } catch (const std::exception& e) {
                     std::cerr << "❌ Error in RSS callback: " << e.what() << std::endl;
                 } catch (...) {
@@ -209,8 +227,8 @@ std::string RSSAtomPoller::download_feed(const std::string& feed_url) {
         auto response = http_client_->download_feed(feed_url);
         
         if (!response.success) {
-            std::cerr << "Failed to download feed " << feed_url << ": " 
-                      << HttpClient::curl_error_string(response.curl_code) << std::endl;
+            // std::cerr << "Failed to download feed " << feed_url << ": " 
+            //           << HttpClient::curl_error_string(response.curl_code) << std::endl;
             return "";
         }
         
@@ -355,17 +373,30 @@ size_t RSSAtomPoller::get_active_feeds_count() const {
 }
 
 void RSSAtomPoller::print_feed_stats() const {
-    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(feeds_mutex_));
-    std::cout << "\n=== RSS/Atom Feed Statistics ===" << std::endl;
-    std::cout << "Total feeds: " << feeds_.size() << std::endl;
-    std::cout << "Active feeds: " << get_active_feeds_count() << std::endl;
+    size_t total_feeds;
+    size_t active_feeds;
+    std::vector<FeedInfo> feeds_copy;
     
-    for (const auto& feed : feeds_) {
-        std::cout << "Feed: " << feed.feed_url 
-                  << " | Interval: " << feed.poll_interval_minutes << "min"
-                  << " | Failures: " << feed.consecutive_failures
-                  << " | Enabled: " << (feed.enabled ? "Yes" : "No") << std::endl;
+    // Get all data while holding the lock, then print without the lock
+    {
+        std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(feeds_mutex_));
+        total_feeds = feeds_.size();
+        active_feeds = std::count_if(feeds_.begin(), feeds_.end(), 
+                                   [](const FeedInfo& feed) { return feed.enabled; });
+        feeds_copy = feeds_; // Copy for printing later
     }
+    
+    // Now print without holding any locks
+    std::cout << "\n=== RSS/Atom Feed Statistics ===" << std::endl;
+    std::cout << "Total feeds: " << total_feeds << std::endl;
+    std::cout << "Active feeds: " << active_feeds << std::endl;
+    
+    // for (const auto& feed : feeds_copy) {
+    //     std::cout << "Feed: " << feed.feed_url 
+    //               << " | Interval: " << feed.poll_interval_minutes << "min"
+    //               << " | Failures: " << feed.consecutive_failures
+    //               << " | Enabled: " << (feed.enabled ? "Yes" : "No") << std::endl;
+    // }
     std::cout << "================================\n" << std::endl;
 }
 

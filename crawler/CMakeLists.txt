@@ -29,6 +29,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG -fsanitize=address -mavx2 -mfma")
 find_package(CURL REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(RocksDB REQUIRED)
+pkg_check_modules(RE2 REQUIRED re2)
+
 
 # Load submodule include helper
 include(${CMAKE_SOURCE_DIR}/cmake/IncludeGitSubmodule.cmake)
@@ -38,23 +40,6 @@ pkg_check_modules(SQLITE3 REQUIRED sqlite3)
 
 # TinyXML2 dependency for XML parsing
 pkg_check_modules(TINYXML2 REQUIRED tinyxml2)
-
-# Hyperscan for ultra-fast pattern matching (optional for ultra_parser)
-find_path(HYPERSCAN_INCLUDE_DIR hs/hs.h PATHS /usr/include /usr/local/include)
-find_library(HYPERSCAN_LIBRARY NAMES hs PATHS /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu)
-
-if(HYPERSCAN_INCLUDE_DIR AND HYPERSCAN_LIBRARY)
-    add_library(Hyperscan::Hyperscan UNKNOWN IMPORTED)
-    set_target_properties(Hyperscan::Hyperscan PROPERTIES
-        IMPORTED_LOCATION "${HYPERSCAN_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${HYPERSCAN_INCLUDE_DIR}"
-    )
-    message(STATUS "Hyperscan found: ${HYPERSCAN_LIBRARY}")
-    add_compile_definitions(HAVE_HYPERSCAN=1)
-else()
-    message(STATUS "Hyperscan not found. Ultra parser will use fallback pattern matching.")
-    add_compile_definitions(HAVE_HYPERSCAN=0)
-endif()
 
 
 # Include additional Git submodules (header-only)
@@ -113,17 +98,17 @@ set(SOURCES
     src/parsing/ultra_parser.cpp
     src/parsing/language_detector.cpp
     src/parsing/content_filter.cpp
-    src/parsing/snippet_extractor.cpp
     src/parsing/html_document.cpp
     src/parsing/rss_poller.cpp
     src/parsing/sitemap_parser.cpp
     
     # Storage layer
     src/storage/enhanced_storage.cpp
+    src/storage/gdrive_mount_manager.cpp
+    src/storage/gdrive_mount_storage.cpp
     
     # Monitoring and logging
     src/monitoring/performance_monitor.cpp
-    src/monitoring/crawl_logger.cpp
     src/monitoring/error_tracker.cpp
      src/storage/crawl_metadata.cpp
     
@@ -151,6 +136,7 @@ target_include_directories(crawler PRIVATE
     ${PROJECT_SOURCE_DIR}/src/utils
     ${PROJECT_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/third_party/tracy/public
+     ${RE2_INCLUDE_DIRS}
 )
 
 # Linking for modular crawler
@@ -163,12 +149,10 @@ target_link_libraries(crawler PRIVATE
     pthread
     stdc++fs
     RocksDB::rocksdb
+    ${RE2_LIBRARIES}
+
 )
 
-# Link optional high-performance libraries
-if(HYPERSCAN_LIBRARY)
-    target_link_libraries(crawler PRIVATE ${HYPERSCAN_LIBRARY})
-endif()
 
 # Install targets
 install(TARGETS crawler DESTINATION bin)

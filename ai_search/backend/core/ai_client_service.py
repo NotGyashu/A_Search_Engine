@@ -12,7 +12,7 @@ import sys
 
 # Add common utilities
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from common.utils import Logger
+from utils.helpers import Logger
 
 class AIClientService:
     """Client for communicating with AI Runner microservice"""
@@ -21,11 +21,11 @@ class AIClientService:
         self.ai_runner_url = ai_runner_url.rstrip('/')
         self.logger = Logger.setup_logger("backend.ai_client")
         self.timeout = 30  # 30 second timeout for AI operations
-        print(f"AI Client initialized with URL: ")
+        self.logger.info(f"🤖 AI Client initialized with URL: {self.ai_runner_url}")
         
     def generate_summary(self, query: str, results: List[Dict], max_length: int = 300) -> Dict:
         """Generate AI summary by calling the AI Runner microservice"""
-        print(f"Generating AI summary for query: '' with  results in ai_search/backend/core/ai_client_service.py")
+        self.logger.info(f"📝 Generating AI summary for query: '{query}' with {len(results)} results")
         if not results:
             return {
                 'summary': "No results found for your query.",
@@ -37,22 +37,14 @@ class AIClientService:
         start_time = time.time()
         
         try:
-           
             # Prepare request
             request_data = {
                 "query": query,
                 "results": results,
                 "max_length": max_length
             }
-             # Add timeout to request
-            response = requests.post(
-                f"{self.ai_runner_url}/summarize",
-                json=request_data,
-                timeout=60,  # Increase timeout to 20 seconds
-                headers={"Content-Type": "application/json"}
-            )
-            # Call AI Runner
-            self.logger.info(f"Calling AI Runner for query: '{query}'")
+            
+            self.logger.info(f"🚀 Calling AI Runner at {self.ai_runner_url}/summarize")
             response = requests.post(
                 f"{self.ai_runner_url}/summarize",
                 json=request_data,
@@ -60,9 +52,11 @@ class AIClientService:
                 headers={"Content-Type": "application/json"}
             )
             
+            self.logger.info(f"📡 AI Runner response status: {response.status_code}")
+            
             if response.status_code == 200:
                 result = response.json()
-                self.logger.info(f"AI summary generated using {result.get('model_used', 'unknown')}")
+                self.logger.info(f"✅ AI summary generated using {result.get('model_used', 'unknown')}")
                 return {
                     'summary': result['summary'],
                     'model_used': result['model_used'],
@@ -70,7 +64,7 @@ class AIClientService:
                     'error': result.get('error')
                 }
             else:
-                error_msg = f"AI Runner returned status {response.status_code}"
+                error_msg = f"AI Runner returned status {response.status_code}: {response.text}"
                 self.logger.error(error_msg)
                 return self._fallback_summary(query, results, error_msg, start_time)
                 

@@ -70,8 +70,12 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
     // Priority 2: Main smart queue
     if(!found_url) { // use if(!found_url) to avoid nesting zones
         ZoneScopedN("Dequeue SmartQ"); // <--- ADD THIS
+        // std::cout << "Worker " << worker_id << ": Trying to dequeue from smart_url_frontier" << std::endl;
         if (smart_url_frontier->dequeue(url_info)) {
+            // std::cout << "Worker " << worker_id << ": Successfully dequeued URL: " << url_info.url << std::endl;
             found_url = true;
+        } else {
+            // std::cout << "Worker " << worker_id << ": smart_url_frontier->dequeue() returned false" << std::endl;
         }
     }
     // Priority 3: Work stealing
@@ -317,7 +321,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                             // Handle conditional GET responses
                             if (http_code == 304) {
                                 // Content not modified - no need to process
-                                std::cout << "304 Not Modified: " << ctx->url << std::endl;
+                                // std::cout << "304 Not Modified: " << ctx->url << std::endl;
                                 // Content hasn't changed, don't update metadata backoff
                                 
                             } else if (http_code == CrawlerConstants::HttpStatus::OK && !ctx->response_data.empty()) {
@@ -370,7 +374,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                                 }
                             } else if (http_code == CrawlerConstants::HttpStatus::TOO_MANY_REQUESTS || 
                                     http_code == CrawlerConstants::HttpStatus::SERVICE_UNAVAILABLE) {
-                                std::cout << "⏳ Server busy (" << http_code << "): " << ctx->url << ". Applying backoff.\n";
+                                // std::cout << "⏳ Server busy (" << http_code << "): " << ctx->url << ". Applying backoff.\n";
                                 metadata_store->record_temporary_failure(ctx->url);
                             }
                         } else {
@@ -407,7 +411,7 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
                                 
                                 if (error_tracker.should_blacklist_domain(ctx->domain)) {
                                     blacklist.add_temporary(ctx->domain);
-                                    std::cout << "Worker " << worker_id << " blacklisted domain: " << ctx->domain << std::endl;
+                                    // std::cout << "Worker " << worker_id << " blacklisted domain: " << ctx->domain << std::endl;
                                 }
                             }
                         }
@@ -427,16 +431,16 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
         }
         
         // Periodic progress reporting
-        if (pages_processed % CrawlerConstants::Monitoring::PROGRESS_REPORT_FREQUENCY == 0 && pages_processed > 0) {
-            auto now = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - worker_start).count();
-            if (elapsed > 0) {
-                double rate = static_cast<double>(pages_processed) / elapsed;
-                std::cout << "🌐 Worker " << worker_id << ": " 
-                         << pages_processed << " pages (" 
-                         << std::fixed << std::setprecision(1) << rate << " pages/s)\n";
-            }
-        }
+        // if (pages_processed % CrawlerConstants::Monitoring::PROGRESS_REPORT_FREQUENCY == 0 && pages_processed > 0) {
+        //     auto now = std::chrono::steady_clock::now();
+        //     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - worker_start).count();
+            // if (elapsed > 0) {
+            //     double rate = static_cast<double>(pages_processed) / elapsed;
+            //     std::cout << "🌐 Worker " << worker_id << ": " 
+            //              << pages_processed << " pages (" 
+            //              << std::fixed << std::setprecision(1) << rate << " pages/s)\n";
+            // }
+        // }
     }
     
     // Cleanup remaining requests
@@ -455,8 +459,8 @@ void multi_crawler_worker(int worker_id, RobotsTxtCache& robots, RateLimiter& li
  * Separates HTML parsing from network I/O for better pipeline efficiency
  */
 void html_processing_worker(int worker_id, RobotsTxtCache& robots, CrawlerMode mode) {
-    std::cout << "🔧 HTML processor " << worker_id << " starting...\n";
-    ZoneScopedN("HtmlWorker Loop");
+    // std::cout << "🔧 HTML processor " << worker_id << " starting...\n";
+    // ZoneScopedN("HtmlWorker Loop");
     int links_processed = 0;
     int batches_processed = 0;
     auto worker_start = std::chrono::steady_clock::now();
@@ -485,14 +489,13 @@ void html_processing_worker(int worker_id, RobotsTxtCache& robots, CrawlerMode m
             // 1. Construct the HtmlDocument from raw HTML
             HtmlDocument doc(task.html);
             
-            // 2. Extract clean text for language detection
-            const std::string& clean_text = doc.getCleanText();
             
             // 3. Language detection: filter non-English pages
             bool is_english = false;
+            //TODO:Language detection
             {
                 ZoneScopedN("Detect Language");
-                is_english = FastLanguageDetector::is_english_content(clean_text, task.url);
+                is_english = FastLanguageDetector::is_english_content(task.html, task.url);
             }
             
             if (!is_english) {
@@ -551,10 +554,10 @@ void html_processing_worker(int worker_id, RobotsTxtCache& robots, CrawlerMode m
                 auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - worker_start).count();
                 if (elapsed > 0) {
                     double rate = static_cast<double>(links_processed) / elapsed;
-                    std::cout << "🔧 HTML processor " << worker_id << ": " 
-                             << batches_processed << " batches, " 
-                             << links_processed << " links (" 
-                             << std::fixed << std::setprecision(1) << rate << " links/s)\n";
+                    // std::cout << "🔧 HTML processor " << worker_id << ": " 
+                    //          << batches_processed << " batches, " 
+                    //          << links_processed << " links (" 
+                    //          << std::fixed << std::setprecision(1) << rate << " links/s)\n";
                 }
             }
             

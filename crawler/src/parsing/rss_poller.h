@@ -37,20 +37,20 @@ struct FeedEntry {
 struct FeedInfo {
     std::string feed_url;
     std::string site_domain;
-    std::chrono::system_clock::time_point last_poll_time;
-    std::chrono::system_clock::time_point next_poll_time;
+    std::chrono::steady_clock::time_point last_poll_time;
+    std::chrono::steady_clock::time_point next_poll_time;
     int poll_interval_minutes = 10; // Default 10 minutes
     int consecutive_failures = 0;
     bool enabled = true;
     
     FeedInfo(const std::string& url = "") : feed_url(url) {
-        auto now = std::chrono::system_clock::now();
+        auto now = std::chrono::steady_clock::now();
         last_poll_time = now;
         next_poll_time = now;
     }
     
     bool is_ready_for_poll() const {
-        return enabled && (std::chrono::system_clock::now() >= next_poll_time);
+        return enabled && (std::chrono::steady_clock::now() >= next_poll_time);
     }
     
     void update_next_poll_time() {
@@ -60,13 +60,13 @@ struct FeedInfo {
             actual_interval = std::min(60, poll_interval_minutes * (1 << consecutive_failures)); // Max 1 hour
         }
         
-        next_poll_time = std::chrono::system_clock::now() + 
+        next_poll_time = std::chrono::steady_clock::now() + 
                         std::chrono::minutes(actual_interval);
     }
     
     void record_success() {
         consecutive_failures = 0;
-        last_poll_time = std::chrono::system_clock::now();
+        last_poll_time = std::chrono::steady_clock::now();
         update_next_poll_time();
     }
     

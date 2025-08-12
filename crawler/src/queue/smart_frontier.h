@@ -10,6 +10,7 @@
 #include <atomic>
 #include <chrono>
 #include <unordered_set>
+#include "../third_party/concurrentqueue/concurrentqueue.h"
 
 namespace CrawlScheduling {
 
@@ -19,7 +20,7 @@ struct SmartUrlInfo {
     int depth;
     std::string referring_domain;
     std::chrono::steady_clock::time_point discovered_time;
-    std::chrono::system_clock::time_point expected_crawl_time;
+    std::chrono::steady_clock::time_point expected_crawl_time;
     
     SmartUrlInfo(const std::string& u, float p = 0.5f, int d = 0, const std::string& ref = "");
     SmartUrlInfo(const UrlInfo& url_info);
@@ -39,6 +40,7 @@ private:
         std::unordered_set<std::string> seen_urls_;
         mutable std::mutex mutex_;
         std::atomic<size_t> size_{0};
+        std::atomic<bool> has_ready_urls_{false};  // NEW: Track if partition has ready URLs
         Partition();
     };
     
@@ -48,7 +50,16 @@ private:
     std::atomic<int> max_depth_{5};
     std::shared_ptr<CrawlMetadataStore> metadata_store_;
     
+    // NEW: High-performance ready partition tracking
+    moodycamel::ConcurrentQueue<size_t> ready_partitions_;  // Lock-free queue of partition indices with ready URLs
+    std::atomic<size_t> ready_partition_count_{0};         // Fast count of ready partitions
+    
     size_t get_partition_index(const std::string& url) const;
+    
+    // NEW: High-performance ready partition management
+    void mark_partition_ready(size_t partition_idx);     // Mark a partition as having ready URLs
+    void mark_partition_not_ready(size_t partition_idx); // Mark a partition as empty/not ready
+    bool check_and_update_ready_status(size_t partition_idx); // Check if partition has ready URLs and update tracking
     
 public:
     SmartUrlFrontier(std::shared_ptr<CrawlMetadataStore> metadata_store);

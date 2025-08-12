@@ -1,52 +1,60 @@
+# ai_search/backend/api/routes.py
 """
-Parallel Search API - Clean implementation with instant search + background AI
+API Routes - Simplified for the new Elasticsearch architecture.
 """
 
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from typing import Optional, List
+from typing import Optional
 import time
 import asyncio
 import json
 import uuid
+import os
 import sys
 from pathlib import Path
 
-# Add common utilities
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from common.utils import Logger
+from utils.helpers import Logger
 
 from .models import *
-from ..core.database_service import DatabaseService
+# Import the new, streamlined set of services
 from ..core.enhanced_search_service import EnhancedSearchService
 from ..core.ai_client_service import AIClientService
 
-# Initialize logger
-logger = Logger.setup_logger("backend.api.parallel_routes")
-
-# Create router
+logger = Logger.setup_logger("backend.api.routes")
 router = APIRouter()
 
-# Global storage for AI summary tasks
-ai_summary_tasks = {}
+# This global dictionary is required to track the status of background AI tasks.
+ai_summary_tasks: Dict[str, Dict] = {}
+websocket_connections: Dict[str, WebSocket] = {}
 
-# Active WebSocket connections
-websocket_connections = {}
+# --- Simplified Service Management ---
 
 def get_services():
-    """Get all services"""
+    """
+    Initializes and returns the application's core services.
+    This function now only creates the essential services needed.
+    """
+    # Using a simple singleton pattern to ensure services are created only once.
     if not hasattr(get_services, '_services'):
-        db_service = DatabaseService()
-        search_service = EnhancedSearchService(db_service)
-        ai_service = AIClientService()
+        logger.info("🚀 Initializing core services...")
+        search_service = EnhancedSearchService()
+        
+        # Get AI Runner URL from environment variable
+        ai_runner_url = os.getenv("AI_RUNNER_URL", "http://127.0.0.1:8001")
+        logger.info(f"🤖 AI Runner URL: {ai_runner_url}")
+        ai_service = AIClientService(ai_runner_url=ai_runner_url)
         
         get_services._services = {
-            'db': db_service,
             'search': search_service,
             'ai': ai_service
         }
+        logger.info("✅ Core services initialized successfully.")
     
     return get_services._services
+
+# --- API Endpoints ---
 
 @router.get("/search")
 async def parallel_search(
@@ -55,86 +63,79 @@ async def parallel_search(
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """
-    Parallel search: Returns instant search results + starts background AI summarization
+    Performs an instant search using Elasticsearch and starts a background task
+    for AI summarization, returning a request ID for WebSocket streaming.
     """
+    print("searching...")
     try:
         start_time = time.time()
         services = get_services()
         
-        # 1. Perform instant search
+        # 1. Perform instant search using the single, powerful search service
         search_result = services['search'].search(query=q, limit=limit)
         
         if search_result.get('error'):
             raise HTTPException(status_code=400, detail=f"Search failed: {search_result['error']}")
         
-        # 2. Generate unique request ID for AI tracking
+        # 2. Generate unique ID and start background AI task
         ai_request_id = str(uuid.uuid4())
+        logger.info(f"🎯 Starting background AI task for query: '{q}' with ID: {ai_request_id[:8]}")
         
-        # 3. Start background AI summarization task
-        ai_summary_tasks[ai_request_id] = {
-            'status': 'generating',
-            'progress': 'Initializing AI...',
-            'created_at': time.time()
-        }
-        
-        # Start background task
         background_tasks.add_task(
             generate_ai_summary_background,
             q,
             search_result['results'],
             ai_request_id,
-            services
+            services['ai'] # Pass the AI service to the background task
         )
         
-        # 4. Return instant search results
-        total_time = round((time.time() - start_time) * 1000, 2)
+        # 3. Return instant search results
+        search_result['ai_summary_request_id'] = ai_request_id
+        search_result['total_time_ms'] = round((time.time() - start_time) * 1000, 2)
         
-        response = {
-            'query': q,
-            'results': [
-                {
-                    'id': result['id'],
-                    'url': result['url'], 
-                    'title': result['title'],
-                    'content_preview': result['content_preview'],
-                    'domain': result['domain'],
-                    'word_count': result['word_count'],
-                    'relevance_score': result['relevance_score']
-                }
-                for result in search_result['results']
-            ],
-            'total_found': search_result['total_found'],
-            'search_time_ms': search_result['search_time_ms'],
-            'total_time_ms': total_time,
-            'ai_summary_request_id': ai_request_id
-        }
+        logger.info(f"Parallel search for '{q}': {search_result['total_found']} results in {search_result['total_time_ms']}ms. AI task ID: {ai_request_id[:8]}")
         
-        logger.info(f"Parallel search: '{q}' -> {len(response['results'])} results in {total_time}ms, AI task started")
-        
-        return response
+        return search_result
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Search error: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Unexpected search error for query '{q}': {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal server error occurred during search.")
 
-async def generate_ai_summary_background(query: str, results: list, request_id: str, services: dict):
-    """Background task to generate AI summary with streaming"""
+async def generate_ai_summary_background(query: str, results: list, request_id: str, ai_service: AIClientService):
+    """Background task to generate AI summary via the AI Runner."""
     try:
-         # Wait for WebSocket connection to be established
+        # Initialize the task status first
+        ai_summary_tasks[request_id] = {
+            'status': 'starting',
+            'created_at': time.time()
+        }
+        
+        logger.info(f"🤖 Starting AI summary generation for query: '{query}' with {len(results)} results")
+        
+        # Wait for WebSocket connection to be established (but don't block forever)
         start_wait = time.time()
         while request_id not in websocket_connections:
             if time.time() - start_wait > 10:  # 10-second timeout
-                logger.warning(f"WebSocket connection for {request_id} not established")
-                return
+                logger.warning(f"WebSocket connection for {request_id} not established - proceeding anyway")
+                break  # Continue without WebSocket instead of returning
             await asyncio.sleep(0.1)
-        # Update progress
-        ai_summary_tasks[request_id]['progress'] = 'Analyzing search results...'
-        await notify_websocket_progress(request_id, 'Analyzing search results...')
+            
+        # Update progress if WebSocket is connected
+        if request_id in websocket_connections:
+            ai_summary_tasks[request_id]['status'] = 'processing'
+            ai_summary_tasks[request_id]['progress'] = 'Analyzing search results...'
+            await notify_websocket_progress(request_id, 'Analyzing search results...')
+        else:
+            ai_summary_tasks[request_id]['status'] = 'processing'
         
-        # Generate AI summary
-        ai_result = services['ai'].generate_summary(query=query, results=results)
+        logger.info(f"🔄 Calling AI service for summary generation...")
+        
+        # Generate AI summary using the correct ai_service parameter
+        ai_result = ai_service.generate_summary(query=query, results=results)
+        
+        logger.info(f"✅ AI service responded with result: {ai_result.get('model_used', 'unknown')}")
         
         if not ai_result.get('error'):
             # Stream the summary in chunks for typing effect
@@ -380,3 +381,31 @@ async def get_config():
         'parallel_processing': True,
         'version': '1.0.0'
     }
+
+@router.get("/debug/ai-test")
+async def debug_ai_test():
+    """Debug endpoint to test AI service directly"""
+    try:
+        services = get_services()
+        ai_service = services['ai']
+        
+        # Test with a simple query
+        test_results = [
+            {"title": "Test Article", "content_preview": "This is a test article about machine learning."},
+            {"title": "Another Test", "content_preview": "Another test article about AI technology."}
+        ]
+        
+        logger.info("🧪 Testing AI service directly...")
+        result = ai_service.generate_summary(query="test", results=test_results)
+        
+        return {
+            'ai_service_status': 'working',
+            'test_result': result,
+            'ai_runner_url': ai_service.ai_runner_url
+        }
+    except Exception as e:
+        logger.error(f"❌ AI test failed: {e}")
+        return {
+            'ai_service_status': 'failed',
+            'error': str(e)
+        }

@@ -27,8 +27,6 @@ struct EnrichedPageData {
     std::string url;
     std::string content;
     std::string domain;
-    std::string title;
-    std::string text_snippet;  // High-quality preview snippet for search results
     int depth;
     
     // Phase 1: Crawl scheduling metadata
@@ -82,8 +80,6 @@ struct EnrichedPageData {
         json << "  {\n";
         json << "    \"url\": \"" << escape_json_string(url) << "\",\n";
         json << "    \"domain\": \"" << escape_json_string(domain) << "\",\n";
-        json << "    \"title\": \"" << escape_json_string(title) << "\",\n";
-        json << "    \"text_snippet\": \"" << escape_json_string(text_snippet) << "\",\n";
         json << "    \"timestamp\": \"" << TimeUtils::time_to_iso_string(last_crawl_time) << "\",\n";
         json << "    \"depth\": " << depth << ",\n";
         json << "    \"http_status_code\": " << http_status_code << ",\n";
@@ -163,8 +159,10 @@ private:
     std::queue<EnrichedStorageBatch> storage_queue_;
     std::mutex queue_mutex_;
     std::condition_variable queue_cv_;
+    std::condition_variable flush_cv_;  // ✅ Add flush completion signal
     std::thread storage_thread_;
     std::atomic<bool> shutdown_{false};
+    std::atomic<bool> flush_requested_{false};  // ✅ Add flush request flag
     
     // Reference to metadata store for enriching data
     std::shared_ptr<CrawlMetadataStore> metadata_store_;
@@ -185,7 +183,7 @@ public:
     
     // Create enriched page data from basic info
     EnrichedPageData create_enriched_data(const std::string& url, const std::string& content,
-                                         const std::string& title = "", int depth = 0,
+                                         int depth = 0,
                                          int http_status = 200);
     
     void flush();

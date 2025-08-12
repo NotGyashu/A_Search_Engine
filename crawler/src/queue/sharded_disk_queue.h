@@ -43,7 +43,7 @@ public:
     ~ShardedDiskQueue();
     
     bool save_urls_to_disk(const std::vector<std::string>& urls);
-    std::vector<std::string> load_urls_from_disk(size_t max_count = 200);
+    std::vector<std::string> load_urls_from_disk(size_t max_count);
     size_t get_total_disk_queue_size() const;
     void cleanup_empty_shards();
 };

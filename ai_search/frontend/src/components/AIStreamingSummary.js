@@ -31,11 +31,13 @@ const AIStreamingSummary = ({ requestId, query, className = '' }) => {
         websocketRef.current?.close();
       }
     }, 10000);
+  const backendHost = process.env.REACT_APP_BACKEND_URL || window.location.hostname;
+  const wsPort = process.env.REACT_APP_WS_PORT || '8000';
+  const wsPath = process.env.REACT_APP_WS_PATH || `/api/ws/summary`;
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
-    const backendHost = process.env.REACT_APP_BACKEND_URL || window.location.hostname;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${backendHost}:8000/api/ws/summary/${requestId}`;
-    
+const wsUrl = `${protocol}//${backendHost}:${wsPort}${wsPath}/${requestId}`;
+
     websocketRef.current = new WebSocket(wsUrl);
     websocketRef.current.withCredentials = true;
 

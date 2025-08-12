@@ -33,26 +33,24 @@ namespace Workers {
     constexpr int DEFAULT_MAX_THREADS = 4;
     constexpr int MIN_THREADS = 1;
     constexpr int MAX_THREADS = 32;
-    // REFACTORED: Changed ratio from 8 to 2 for better balance.
-    // 8 network workers will now result in 4 HTML workers.
-    constexpr int HTML_WORKER_RATIO = 8;
+    constexpr int HTML_WORKER_RATIO = 4;
     constexpr int MIN_HTML_WORKERS = 1;
-    constexpr int MAX_WORK_STEALING_QUEUE_SIZE = 1000; // Max size for work stealing queue
 }
 
 // =============== QUEUE CONFIGURATION ===============
 namespace Queue {
     constexpr int DEFAULT_MAX_DEPTH = 4;
     constexpr int DEFAULT_MAX_QUEUE_SIZE = 50000;
-    constexpr int DEFAULT_WORK_STEALING_QUEUE_SIZE = 50000;
+    constexpr int MAX_WORK_STEALING_QUEUE_SIZE = 3000; // Max size for work stealing queue
     constexpr int MAX_CONCURRENT_REQUESTS = 45;
     constexpr int MAX_QUEUE_DRAIN_ATTEMPTS = 100;
-    constexpr int DISK_LOAD_BATCH_SIZE = 1000;
-    constexpr int REFILL_THRESHOLD = 1000;
+    constexpr int DISK_LOAD_BATCH_SIZE = 20000;
+    constexpr int REFILL_THRESHOLD = 5000;
     constexpr int LOW_QUEUE_THRESHOLD = 100;
     constexpr int CRITICAL_QUEUE_THRESHOLD = 10;
     constexpr int DOMAIN_QUEUE_LIMIT = 100;
-    constexpr int SHARDED_DISK_LOAD_SIZE = 1000;
+    constexpr int SHARDED_DISK_LOAD_SIZE = 1250;
+    constexpr int HTML_QUEUE_SIZE = 30000;
 }
 
 // =============== LINK EXTRACTION ===============
@@ -180,7 +178,7 @@ namespace Headers {
 namespace Paths {
     constexpr const char* DB_PATH = "../data/processed/hybrid_crawl_metadata.db";
     constexpr const char* LOG_PATH = "../data/processed/hybrid_crawl_log.csv";
-    constexpr const char* RAW_DATA_PATH = "../../RawHTMLdata";
+    constexpr const char* RAW_DATA_PATH = "../../RawHTMLdata";  // Legacy local path (fallback)
     constexpr const char* BLACKLIST_PATH = "../data/blacklist.txt";
     constexpr const char* SHARDED_DISK_PATH = "../data/sharded";
     constexpr const char* CONFIG_PATH = "../config";
@@ -188,6 +186,15 @@ namespace Paths {
     constexpr const char* ROBOTS_TXT_CACHE_PATH = "../cache/rocksdb_robots_txt_cache";
     constexpr const char* ROCKSDB_RATE_LIMITER_PATH = "../cache/rocksdb_rate_limiter_cache";
     constexpr const char* ROCKSDB_METADATA_PATH = "../cache/rocksdb_metadata_store";
+}
+
+// =============== GDRIVE MOUNT CONSTANTS ===============
+namespace GDriveMount {
+    constexpr const char* MOUNT_POINT = "/mnt/gdrive-crawler";
+    constexpr const char* RCLONE_REMOTE = "rclone-gdrive";
+    constexpr const char* REMOTE_PATH = "RawHTML";
+    constexpr const char* DAILY_SUBDIR = "daily";
+    constexpr const char* LIVE_SUBDIR = "live";
 }
 
 // =============== HTTP STATUS CODES ===============
@@ -200,16 +207,16 @@ namespace HttpStatus {
 
 // =============== FRESH MODE CONFIGURATION ===============
 namespace FreshMode {
-    constexpr int RSS_POLL_INTERVAL_SECONDS = 60;
+    constexpr int RSS_POLL_INTERVAL_SECONDS = 5;
     constexpr int HTML_WORKERS = 1;
     constexpr int NETWORK_WORKERS = 1;
-    constexpr int MAX_QUEUE_SIZE = 5000;
+    constexpr int MAX_QUEUE_SIZE = 3000;
     constexpr int MAX_CRAWL_DEPTH = 2;
     constexpr int STARTUP_GRACE_SECONDS = 5;
     constexpr int MONITORING_INTERVAL_SECONDS = 10;
     constexpr bool USE_DISK_QUEUE = false;
     constexpr bool LOAD_EXISTING_URLS = false;
-    constexpr int FRESH_MODE_MAX_WORK_STEALING_QUEUE_SIZE = 100;
+    constexpr int FRESH_MODE_MAX_WORK_STEALING_QUEUE_SIZE = 2000; // Increased for RSS bursts
 }
 
 

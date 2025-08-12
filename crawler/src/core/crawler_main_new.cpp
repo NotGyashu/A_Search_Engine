@@ -67,5 +67,6 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "🏁 Crawler shutdown complete.\n";
+    shutdown_curl_global();
     return 0;
 }

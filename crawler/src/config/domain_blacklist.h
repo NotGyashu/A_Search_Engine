@@ -19,5 +19,4 @@ public:
     void add_permanent(const std::string& domain);
     void cleanup_expired(); // New method to clean expired entries
     size_t size() const;
-    void load_from_file(const std::string& filename);
 };
