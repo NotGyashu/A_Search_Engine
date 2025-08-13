@@ -188,15 +188,6 @@ namespace Paths {
     constexpr const char* ROCKSDB_METADATA_PATH = "../cache/rocksdb_metadata_store";
 }
 
-// =============== GDRIVE MOUNT CONSTANTS ===============
-namespace GDriveMount {
-    constexpr const char* MOUNT_POINT = "/mnt/gdrive-crawler";
-    constexpr const char* RCLONE_REMOTE = "rclone-gdrive";
-    constexpr const char* REMOTE_PATH = "RawHTML";
-    constexpr const char* DAILY_SUBDIR = "daily";
-    constexpr const char* LIVE_SUBDIR = "live";
-}
-
 // =============== HTTP STATUS CODES ===============
 namespace HttpStatus {
     constexpr int OK = 200;

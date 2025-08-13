@@ -14,9 +14,6 @@ std::shared_ptr<CrawlScheduling::CrawlMetadataStore> metadata_store;
 std::unique_ptr<CrawlScheduling::SmartUrlFrontier> smart_url_frontier;
 std::unique_ptr<CrawlScheduling::EnhancedFileStorageManager> enhanced_storage;
 
-// Google Drive mount manager
-std::shared_ptr<GDriveMountManager> gdrive_mount_manager;
-
 // Phase 2: Advanced crawling components
 std::unique_ptr<FeedPolling::RSSAtomPoller> rss_poller;
 std::unique_ptr<SitemapParsing::SitemapParser> sitemap_parser;
@@ -232,12 +229,6 @@ void cleanup_global_components() {
         enhanced_storage.reset();
     }
     
-    // Clean up Google Drive mount manager
-    if (gdrive_mount_manager) {
-        gdrive_mount_manager->shutdown();
-        gdrive_mount_manager.reset();
-    }
-    
     if (sharded_disk_queue) {
         sharded_disk_queue.reset();
     }
@@ -361,14 +352,6 @@ void cleanup_components_safely() {
     if (domain_config_manager) {
         domain_config_manager.reset();
         std::cout << "✅ Domain config manager cleaned up" << std::endl;
-    }
-    
-    // 6. Clean up mount manager LAST (critical for data safety)
-    if (gdrive_mount_manager) {
-        std::cout << "📁 Shutting down mount manager..." << std::endl;
-        gdrive_mount_manager->shutdown();
-        gdrive_mount_manager.reset();
-        std::cout << "✅ Mount manager cleaned up" << std::endl;
     }
     
     // 7. Clear shared data

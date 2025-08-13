@@ -5,17 +5,74 @@
 #include "html_document.h"
 #include "domain_config.h"
 #include "time_utils.h"
+#include <nlohmann/json.hpp>  // ✅ HIGH-PERFORMANCE JSON LIBRARY
 #include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
 #include <ctime>
+#include <future>
+#include <codecvt>
+#include <locale>
 #include "tracy/Tracy.hpp"
+
 // External global components (declared in crawler_main.cpp)
 extern std::unique_ptr<DomainConfiguration::DomainConfigManager> domain_config_manager;
 
 namespace CrawlScheduling {
+
+// ✅ CRITICAL FIX: UTF-8 sanitization to prevent nlohmann/json errors
+std::string sanitize_utf8(const std::string& input) {
+    std::string result;
+    result.reserve(input.size());
+    
+    for (size_t i = 0; i < input.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(input[i]);
+        
+        if (c < 0x80) {
+            // ASCII character - always valid
+            result += c;
+        } else if (c < 0xC0) {
+            // Invalid start byte - replace with placeholder
+            result += '?';
+        } else if (c < 0xE0) {
+            // 2-byte sequence
+            if (i + 1 < input.size() && (input[i + 1] & 0xC0) == 0x80) {
+                result += input.substr(i, 2);
+                i += 1;
+            } else {
+                result += '?';
+            }
+        } else if (c < 0xF0) {
+            // 3-byte sequence
+            if (i + 2 < input.size() && 
+                (input[i + 1] & 0xC0) == 0x80 && 
+                (input[i + 2] & 0xC0) == 0x80) {
+                result += input.substr(i, 3);
+                i += 2;
+            } else {
+                result += '?';
+            }
+        } else if (c < 0xF8) {
+            // 4-byte sequence
+            if (i + 3 < input.size() && 
+                (input[i + 1] & 0xC0) == 0x80 && 
+                (input[i + 2] & 0xC0) == 0x80 && 
+                (input[i + 3] & 0xC0) == 0x80) {
+                result += input.substr(i, 4);
+                i += 3;
+            } else {
+                result += '?';
+            }
+        } else {
+            // Invalid UTF-8 start byte
+            result += '?';
+        }
+    }
+    
+    return result;
+}
 
 EnhancedFileStorageManager::EnhancedFileStorageManager(const std::string& base_path, 
                                                       std::shared_ptr<CrawlMetadataStore> metadata_store)
@@ -40,20 +97,22 @@ EnhancedFileStorageManager::~EnhancedFileStorageManager() {
     
     // Wait for worker thread to finish with timeout
     if (storage_thread_.joinable()) {
-        auto timeout = std::chrono::seconds(10);
+        auto timeout = std::chrono::seconds(5);  // Reduced timeout
         auto start_time = std::chrono::steady_clock::now();
         
-        while (storage_thread_.joinable()) {
-            if (std::chrono::steady_clock::now() - start_time > timeout) {
+        // Give the thread time to finish naturally
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        
+        if (storage_thread_.joinable()) {
+            auto future = std::async(std::launch::async, [this]() {
+                if (storage_thread_.joinable()) {
+                    storage_thread_.join();
+                }
+            });
+            
+            if (future.wait_for(timeout) == std::future_status::timeout) {
                 std::cerr << "⚠️  Storage worker thread timeout - detaching" << std::endl;
                 storage_thread_.detach();
-                break;
-            }
-            
-            // Try to join with a short timeout
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (storage_thread_.joinable()) {
-                storage_thread_.join();
             }
         }
     }
@@ -79,38 +138,53 @@ void EnhancedFileStorageManager::enhanced_storage_worker() {
             storage_queue_.pop();
             lock.unlock();
             
-            std::cerr << "💾 Processing batch " << batch.batch_id << " with " << batch.data.size() << " items" << std::endl;
+            // std::cerr << "💾 🚀 High-speed processing batch " << batch.batch_id << " with " << batch.data.size() << " items" << std::endl;
             
             try {
-                // Process batch without holding locks
+                // ✅ HIGH-PERFORMANCE: Use nlohmann/json for ultra-fast batch serialization
                 std::string batch_filename = "batch_" + TimeUtils::current_timestamp() + "_" + 
                                            batch.batch_id + ".json";
                 std::string filepath = base_path_ + "/" + batch_filename;
                 
-                std::ofstream file(filepath);
-                if (!file.is_open()) {
-                    std::cerr << "Failed to open file for writing: " << filepath << std::endl;
-                    lock.lock();
-                    continue;
-                }
+                // ✅ ULTRA-FAST: Build entire JSON array in memory using nlohmann/json
+                nlohmann::json json_array = nlohmann::json::array();
                 
-                // ✅ NEW: Process in smaller chunks to be more responsive
-                file << "[\n";
-                
-                for (size_t i = 0; i < batch.data.size(); ++i) {
-                    if (i > 0) file << ",\n";
-                    file << batch.data[i].to_json();
+                for (const auto& page_data : batch.data) {
+                    nlohmann::json j;
+                    // ✅ CRITICAL FIX: Sanitize UTF-8 before JSON serialization
+                    j["url"] = sanitize_utf8(page_data.url);
+                    j["domain"] = sanitize_utf8(page_data.domain);
+                    j["timestamp"] = TimeUtils::time_to_iso_string(page_data.last_crawl_time);
+                    j["depth"] = page_data.depth;
+                    j["http_status_code"] = page_data.http_status_code;
+                    j["content_length"] = page_data.content_length;
+                    j["content_hash"] = page_data.content_hash;
+                    j["last_crawl_time"] = TimeUtils::time_to_iso_string(page_data.last_crawl_time);
+                    j["previous_change_time"] = TimeUtils::time_to_iso_string(page_data.previous_change_time);
+                    j["expected_next_crawl"] = TimeUtils::time_to_iso_string(page_data.expected_next_crawl);
+                    j["backoff_multiplier"] = page_data.backoff_multiplier;
+                    j["crawl_count"] = page_data.crawl_count;
+                    j["change_frequency"] = page_data.change_frequency;
+                    j["content"] = sanitize_utf8(page_data.content);  // ✅ MOST IMPORTANT: Sanitize HTML content
+                    
+                    json_array.push_back(std::move(j));
                     
                     // Check for shutdown periodically during large batch processing
-                    if (i % 10 == 0 && shutdown_.load()) {
+                    if (json_array.size() % 20 == 0 && shutdown_.load()) {
                         break;  // Stop processing if shutdown requested
                     }
                 }
                 
-                file << "\n]\n";
-                file.close();
-                
-                std::cerr << "✅ Successfully wrote batch " << batch.batch_id << " to " << filepath << std::endl;
+                // ✅ SINGLE ATOMIC WRITE: Much faster than incremental writing
+                std::ofstream file(filepath);
+                if (file.is_open()) {
+                    file << json_array.dump(2);  // Pretty-printed
+                    file.close();
+                    
+                    // std::cerr << "✅ 🚀 Ultra-fast wrote batch " << batch.batch_id << " (" << json_array.size() << " items)" << std::endl;
+                } else {
+                    std::cerr << "❌ Failed to open file for writing: " << filepath << std::endl;
+                }
                 
                 processed_this_cycle++;
                 
@@ -234,7 +308,7 @@ EnrichedPageData EnhancedFileStorageManager::create_enriched_data(const std::str
 void EnhancedFileStorageManager::flush() {
     ZoneScopedN("complete flushing");
     auto start_time = std::chrono::steady_clock::now();
-    const auto max_flush_time = std::chrono::seconds(30);
+    const auto max_flush_time = std::chrono::seconds(10);  // Reduced from 30 to 10 seconds
     
     // ✅ FIX: Aggressive flush with hard timeout
     {
@@ -252,7 +326,7 @@ void EnhancedFileStorageManager::flush() {
     while (!flushed) {
         auto elapsed = std::chrono::steady_clock::now() - start_time;
         if (elapsed >= max_flush_time) {
-            std::cerr << "⚠️  Storage flush timeout after 30 seconds - forcing completion" << std::endl;
+            std::cerr << "⚠️  Storage flush timeout after 10 seconds - forcing completion" << std::endl;
             std::cerr << "📊 Remaining items in storage queue: " << storage_queue_.size() << std::endl;
             
             // Force complete by clearing the queue if necessary

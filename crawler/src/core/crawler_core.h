@@ -28,7 +28,6 @@
 #include "error_tracker.h"
 #include "content_filter.h"
 #include "sharded_disk_queue.h"
-#include "gdrive_mount_manager.h"
 #include "html_processing_queue.h"
 #include "work_stealing_queue.h"
 #include "url_info.h"
@@ -126,9 +125,6 @@ extern PerformanceMonitor global_monitor;
 extern std::shared_ptr<CrawlScheduling::CrawlMetadataStore> metadata_store;
 extern std::unique_ptr<CrawlScheduling::SmartUrlFrontier> smart_url_frontier;
 extern std::unique_ptr<CrawlScheduling::EnhancedFileStorageManager> enhanced_storage;
-
-// Google Drive mount manager
-extern std::shared_ptr<GDriveMountManager> gdrive_mount_manager;
 
 // Phase 2: Advanced crawling components
 extern std::unique_ptr<FeedPolling::RSSAtomPoller> rss_poller;

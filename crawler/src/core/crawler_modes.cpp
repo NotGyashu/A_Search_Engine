@@ -2,8 +2,6 @@
 #include "crawler_workers.h"
 #include "crawler_core.h"
 #include "crawler_monitoring.h"
-#include "gdrive_mount_manager.h"
-#include "gdrive_mount_storage.h"
 #include "time_utils.h"
 #include <iostream>
 #include <thread>
@@ -346,35 +344,11 @@ void initialize_regular_mode_components(int max_depth, int max_queue_size) {
     smart_url_frontier->set_max_depth(max_depth);
     smart_url_frontier->set_max_queue_size(max_queue_size);
     
-    // Phase 1: Initialize Google Drive mount manager
-    // First, cleanup any existing mounts
-    GDriveMountManager::cleanup_existing_mount(CrawlerConstants::GDriveMount::MOUNT_POINT);
-    
-    gdrive_mount_manager = std::make_shared<GDriveMountManager>(
-        CrawlerConstants::GDriveMount::RCLONE_REMOTE,
-        CrawlerConstants::GDriveMount::REMOTE_PATH,
-        CrawlerConstants::GDriveMount::MOUNT_POINT
-    );
-    
-    // Initialize Google Drive mount
-    if (!gdrive_mount_manager->initialize()) {
-        std::cerr << "❌ Failed to initialize Google Drive mount. Falling back to local-only storage." << std::endl;
-        // Fall back to regular storage
-        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
-            CrawlerConstants::Paths::RAW_DATA_PATH, metadata_store);
-    } else {
-        std::cout << "✅ Google Drive mount enabled for REGULAR mode" << std::endl;
-        // Create mount-aware storage that writes directly to Google Drive
-        auto mount_storage = std::make_unique<CrawlScheduling::GDriveMountStorage>(
-            gdrive_mount_manager, metadata_store, "REGULAR");
-        
-        // Wrap in EnhancedFileStorageManager interface for compatibility
-        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
-            gdrive_mount_manager->get_daily_path(TimeUtils::current_date_string()),
-            metadata_store);
-        
-        std::cout << "📁 Storage path: " << gdrive_mount_manager->get_daily_path(TimeUtils::current_date_string()) << std::endl;
-    }
+    // Phase 1: Initialize enhanced storage with local path
+    std::cout << "📁 Using local storage for REGULAR mode" << std::endl;
+    enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
+        CrawlerConstants::Paths::RAW_DATA_PATH, metadata_store);
+    std::cout << "📁 Storage path: " << CrawlerConstants::Paths::RAW_DATA_PATH << std::endl;
     
     // Remove crawl_logger initialization - no longer needed
     // crawl_logger = std::make_unique<CrawlLogger>(
@@ -438,35 +412,11 @@ void initialize_fresh_mode_components() {
     smart_url_frontier->set_max_depth(CrawlerConstants::FreshMode::MAX_CRAWL_DEPTH);
     smart_url_frontier->set_max_queue_size(CrawlerConstants::FreshMode::MAX_QUEUE_SIZE);
     
-    // Phase 1: Initialize Google Drive mount manager for FRESH mode
-    // First, cleanup any existing mounts
-    GDriveMountManager::cleanup_existing_mount(CrawlerConstants::GDriveMount::MOUNT_POINT);
-    
-    gdrive_mount_manager = std::make_shared<GDriveMountManager>(
-        CrawlerConstants::GDriveMount::RCLONE_REMOTE,
-        CrawlerConstants::GDriveMount::REMOTE_PATH,
-        CrawlerConstants::GDriveMount::MOUNT_POINT
-    );
-    
-    // Initialize Google Drive mount
-    if (!gdrive_mount_manager->initialize()) {
-        std::cerr << "❌ Failed to initialize Google Drive mount. Falling back to local-only storage." << std::endl;
-        // Fall back to regular storage
-        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
-            std::string(CrawlerConstants::Paths::RAW_DATA_PATH) + "/Live", metadata_store);
-    } else {
-        std::cout << "✅ Google Drive mount enabled for FRESH mode" << std::endl;
-        // Create mount-aware storage that writes directly to Google Drive Live folder
-        auto mount_storage = std::make_unique<CrawlScheduling::GDriveMountStorage>(
-            gdrive_mount_manager, metadata_store, "FRESH");
-        
-        // Wrap in EnhancedFileStorageManager interface for compatibility
-        enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
-            gdrive_mount_manager->get_live_path(),
-            metadata_store);
-        
-        std::cout << "📁 Live storage path: " << gdrive_mount_manager->get_live_path() << std::endl;
-    }
+    // Phase 1: Initialize enhanced storage with local Live path
+    std::cout << "📁 Using local storage for FRESH mode" << std::endl;
+    enhanced_storage = std::make_unique<CrawlScheduling::EnhancedFileStorageManager>(
+        std::string(CrawlerConstants::Paths::RAW_DATA_PATH), metadata_store);
+    std::cout << "📁 Live storage path: " << std::string(CrawlerConstants::Paths::RAW_DATA_PATH)  << std::endl;
     
     // Remove crawl_logger initialization - no longer needed for fresh mode
     // crawl_logger = std::make_unique<CrawlLogger>(

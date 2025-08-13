@@ -104,8 +104,6 @@ set(SOURCES
     
     # Storage layer
     src/storage/enhanced_storage.cpp
-    src/storage/gdrive_mount_manager.cpp
-    src/storage/gdrive_mount_storage.cpp
     
     # Monitoring and logging
     src/monitoring/performance_monitor.cpp
