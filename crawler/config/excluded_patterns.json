@@ -1,0 +1,4 @@
+["logout", "signout", "signin", "login", "register", "signup",
+    "cart", "checkout", "payment", "billing", "account", "profile",
+    "admin", "wp-admin", "dashboard", "settings", "config",
+    "api/", "ajax/", "json"]

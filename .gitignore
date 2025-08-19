@@ -26,7 +26,6 @@ data/index/
 crawler/data/
 **/data/**
 **/Data/**
-*.json
 *.csv
 *.tsv
 *.parquet

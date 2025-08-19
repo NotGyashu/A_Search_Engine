@@ -1,0 +1,5 @@
+[".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".bmp",
+    ".mp3", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".mkv", ".webm",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".zip", ".rar", ".7z", ".gz", ".tar", ".bz2", ".xz",
+    ".exe", ".msi", ".deb", ".rpm", ".dmg", ".app", ".bin"]

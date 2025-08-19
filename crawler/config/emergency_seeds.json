@@ -1,0 +1,44 @@
+[           
+            "https://httpbin.org/links/100",
+            "https://httpbin.org/range/200",
+            "https://httpbin.org/html",
+            "https://httpbin.org/json",
+            "https://httpbin.org/xml",
+            
+        
+            "https://en.wikipedia.org/wiki/Special:Random",
+            "https://en.wikipedia.org/wiki/List_of_programming_languages",
+            "https://en.wikipedia.org/wiki/Computer_programming",
+            "https://en.wikipedia.org/wiki/Software_engineering",
+            "https://en.wikipedia.org/wiki/Data_science",
+            "https://en.wikipedia.org/wiki/Machine_learning",
+            "https://en.wikipedia.org/wiki/Artificial_intelligence",
+            "https://en.wikipedia.org/wiki/Web_development",
+            "https://en.wikipedia.org/wiki/Database",
+            "https://en.wikipedia.org/wiki/Computer_science",
+            
+        
+            "https://stackoverflow.com/questions",
+            "https://stackoverflow.com/questions/tagged/python",
+            "https://stackoverflow.com/questions/tagged/javascript",
+            "https://stackoverflow.com/questions/tagged/web-scraping",
+            "https://stackoverflow.com/questions/tagged/machine-learning",
+            "https://stackoverflow.com/questions/tagged/database",
+   
+            "https://github.com/trending",
+            "https://github.com/trending/python",
+            "https://github.com/trending/javascript",
+            "https://github.com/topics/machine-learning",
+            "https://github.com/topics/artificial-intelligence",
+            "https://github.com/topics/web-development",
+            
+      
+            "https://news.ycombinator.com",
+            "https://news.ycombinator.com/newest",
+            "https://news.ycombinator.com/best",
+            
+      
+            "https://arxiv.org/list/cs.AI/recent",
+            "https://arxiv.org/list/cs.LG/recent",
+            "https://scholar.google.com/citations?view_op=search_venues&hl=en&vq=computer+science"
+]

@@ -1,0 +1,120 @@
+[      
+        "https://www.metmuseum.org/art/collection",
+        "https://www.tate.org.uk/art/artists",
+        "https://artsandculture.google.com/category/artist",
+        "https://www.nga.gov/collection/artists.html",
+        "https://www.britishmuseum.org/collection",
+
+      
+        "https://www.history.com/topics",
+        "https://www.archives.gov/research/catalog",
+        "https://www.britannica.com/list/browse/history",
+        "https://www.worldhistory.org/timeline/",
+        "https://www.si.edu/collections/history-culture",
+
+       
+        "https://www.nature.com/subjects",
+        "https://www.science.org/toc/science/current",
+        "https://www.nasa.gov/topics/earth/index.html",
+        "https://www.nhm.ac.uk/discover.html",
+        "https://ocean.si.edu/ocean-life",
+
+    
+        "https://www.poetryfoundation.org/poets",
+        "https://plato.stanford.edu/contents.html",
+        "https://www.gutenberg.org/browse/scores/top",
+        "https://www.literaryhub.com/category/features",
+        "https://iep.utm.edu/browse/",
+
+       
+        "https://www.nationalgeographic.com/maps",
+        "https://whc.unesco.org/en/list/",
+        "https://www.lonelyplanet.com/articles",
+        "https://www.cia.gov/the-world-factbook/",
+        "https://www.worldtravelguide.net/features/",
+
+        
+        "https://spectrum.ieee.org/topic/artificial-intelligence/",
+        "https://www.technologyreview.com/category/ai/",
+        "https://www.digitaltrends.com/computing/",
+        "https://www.engineering.com/",
+        "https://www.sciencedaily.com/news/computers_math/computer_science/",
+
+      
+        "https://www.who.int/news-room/feature-stories",
+        "https://www.mayoclinic.org/diseases-conditions/index",
+        "https://www.nih.gov/health-information",
+        "https://www.healthline.com/nutrition",
+        "https://www.cdc.gov/ncezid/",
+
+        
+        "https://www.economist.com/latest-updates",
+        "https://www.bloomberg.com/markets",
+        "https://www.mckinsey.com/featured-insights",
+        "https://www.forbes.com/innovation/",
+        "https://www.worldbank.org/en/topic",
+
+     
+        "https://www.khanacademy.org/library",
+        "https://ocw.mit.edu/courses/",
+        "https://www.coursera.org/courses",
+        "https://www.refdesk.com/facts.html",
+        "https://www.merriam-webster.com/word-of-the-day",
+
+     
+        "https://www.bonappetit.com/recipes",          
+        "https://www.espn.com/olympics/sports/",       
+        "https://www.apa.org/topics",                  
+        "https://www.ipcc.ch/reports/",                
+        "https://www.ethnologue.com/browse/languages", 
+
+     
+        "https://www.reddit.com/r/todayilearned/top/",
+        "https://www.bbc.co.uk/sounds/categories",
+        "https://www.curlie.org/",
+        "https://www.wikihow.com/Main-Page",
+        "https://www.brainpickings.org/archive/",
+
+        
+        "https://en.wikipedia.org/wiki/Special:Random",
+        "https://en.wikipedia.org/wiki/List_of_programming_languages",
+        "https://en.wikipedia.org/wiki/Computer_programming",
+        "https://en.wikipedia.org/wiki/Software_engineering",
+        "https://en.wikipedia.org/wiki/Data_science",
+        "https://en.wikipedia.org/wiki/Machine_learning",
+        "https://en.wikipedia.org/wiki/Artificial_intelligence",
+        "https://en.wikipedia.org/wiki/Web_development",
+        "https://en.wikipedia.org/wiki/Database",
+        "https://en.wikipedia.org/wiki/Computer_science",
+
+        "https://stackoverflow.com/questions",
+        "https://stackoverflow.com/questions/tagged/python",
+        "https://stackoverflow.com/questions/tagged/javascript",
+        "https://stackoverflow.com/questions/tagged/web-scraping",
+        "https://stackoverflow.com/questions/tagged/machine-learning",
+        "https://stackoverflow.com/questions/tagged/database",
+
+      
+        "https://github.com/trending",
+        "https://github.com/trending/python",
+        "https://github.com/trending/javascript",
+        "https://github.com/topics/machine-learning",
+        "https://github.com/topics/artificial-intelligence",
+        "https://github.com/topics/web-development",
+
+
+        "https://news.ycombinator.com",
+        "https://news.ycombinator.com/newest",
+        "https://news.ycombinator.com/best",
+
+        "https://arxiv.org/list/cs.AI/recent",
+        "https://arxiv.org/list/cs.LG/recent",
+        "https://scholar.google.com/citations?view_op=search_venues&hl=en&vq=computer+science",
+
+        
+        "https://httpbin.org/stream/100",      
+        "https://httpbin.org/delay/5",          
+        "https://httpbin.org/status/418",      
+        "https://httpbin.org/bytes/1024",   
+        "https://httpbin.org/user-agent"    
+]
