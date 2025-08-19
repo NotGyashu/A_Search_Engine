@@ -400,7 +400,7 @@ npm install
 npm start
 
 # Terminal 3: Process Data (if needed)
-cd ai_search/data_pipeline
+cd data_pipeline
 python processor.py
 ```
 

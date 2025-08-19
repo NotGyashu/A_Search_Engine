@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Copy crawler source
 COPY crawler/ ./crawler/
-COPY ai_search/data_pipeline/ ./data_pipeline/
+COPY data_pipeline/ ./data_pipeline/
 
 # Build crawler
 RUN cd crawler && \

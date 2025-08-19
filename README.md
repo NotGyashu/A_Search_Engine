@@ -155,7 +155,7 @@
     - **Components**: SearchBox, Results, Features, API documentation
     - **Responsive Design**: Mobile and desktop optimized
 
-    ### Data Pipeline (`ai_search/data_pipeline/`)
+    ### Data Pipeline (`data_pipeline/`)
     - **processor.py**: ETL pipeline for raw HTML data
     - **Features**: Cleaning, deduplication, validation, batch processing
 
@@ -180,7 +180,7 @@
 
     ### 3. Data Processing
     ```bash
-    cd ai_search/data_pipeline
+    cd data_pipeline
     python processor.py  # Process raw data
     ```
 

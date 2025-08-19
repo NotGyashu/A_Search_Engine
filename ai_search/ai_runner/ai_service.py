@@ -1,5 +1,5 @@
 """AI Service for AI Runner Microservice
-Handles all AI-powered summarization with Google Gemini and other models
+Enhanced AI Intelligence Hub - handles summarization, query intelligence, and content analysis
 """
 
 import time
@@ -13,16 +13,26 @@ import logging
 # Load environment variables
 load_dotenv()
 
+# Import new AI services
+from services.query_intelligence import QueryIntelligenceService
+from services.content_analysis import ContentAnalysisService
+
 class AIService:
-    """AI-powered summarization service with multiple model support and caching"""
+    """Enhanced AI Intelligence Hub with multiple AI capabilities"""
     
     def __init__(self):
         self.logger = logging.getLogger("ai_runner.ai_service")
         self.available_models = []
         self.summary_cache = {}  # Simple in-memory cache
         self.cache_ttl = 3600  # Cache TTL in seconds (1 hour)
+        
+        # Initialize enhanced AI services
+        self.query_intelligence = QueryIntelligenceService()
+        self.content_analysis = ContentAnalysisService()
+        
         self._check_available_models()
-        print("in ai_service.py")
+        self.logger.info("🧠 AI Intelligence Hub initialized with enhanced capabilities")
+        print("AI Intelligence Hub initialized in ai_service.py")
     
     def _get_cache_key(self, query: str, results: List[Dict]) -> str:
         """Generate cache key for query and results"""
@@ -433,12 +443,24 @@ Task: Write a concise {max_length//4}-word summary focusing on the key informati
             ]
             
             summary_result = self.generate_summary("test query", test_results)
+            query_intel_health = self.query_intelligence.health_check()
+            content_analysis_health = self.content_analysis.health_check()
             
             return {
                 'status': 'healthy',
                 'available_models': self.available_models,
                 'test_summary_working': summary_result.get('error') is None,
-                'primary_model': self.available_models[0] if self.available_models else "none"
+                'query_intelligence': query_intel_health,
+                'content_analysis': content_analysis_health,
+                'primary_model': self.available_models[0] if self.available_models else "none",
+                'enhanced_features': {
+                    'query_enhancement': query_intel_health.get('status') == 'healthy',
+                    'intent_classification': query_intel_health.get('status') == 'healthy',
+                    'entity_extraction': query_intel_health.get('status') == 'healthy',
+                    'content_analysis': content_analysis_health.get('status') == 'healthy',
+                    'quality_scoring': content_analysis_health.get('status') == 'healthy',
+                    'result_reranking': content_analysis_health.get('status') == 'healthy'
+                }
             }
             
         except Exception as e:
@@ -448,3 +470,183 @@ Task: Write a concise {max_length//4}-word summary focusing on the key informati
                 'error': str(e),
                 'available_models': self.available_models
             }
+
+    # === NEW AI INTELLIGENCE METHODS ===
+    
+    def enhance_query(self, query: str) -> Dict:
+        """
+        Enhance query with expansions and suggestions
+        
+        Args:
+            query: Original search query
+            
+        Returns:
+            Dict with enhanced query and metadata
+        """
+        self.logger.info(f"🔍 Enhancing query: '{query}'")
+        return self.query_intelligence.enhance_query(query)
+    
+    def classify_intent(self, query: str) -> Dict:
+        """
+        Classify the intent of a search query
+        
+        Args:
+            query: Search query to classify
+            
+        Returns:
+            Dict with intent classification and confidence
+        """
+        self.logger.info(f"🎯 Classifying intent for: '{query}'")
+        return self.query_intelligence.classify_intent(query)
+    
+    def extract_entities(self, query: str) -> Dict:
+        """
+        Extract entities from query (technologies, topics, levels, etc.)
+        
+        Args:
+            query: Search query to analyze
+            
+        Returns:
+            Dict with extracted entities
+        """
+        self.logger.info(f"🏷️ Extracting entities from: '{query}'")
+        return self.query_intelligence.extract_entities(query)
+    
+    def analyze_content(self, results: List[Dict]) -> Dict:
+        """
+        Analyze content of search results for quality, type, and insights
+        
+        Args:
+            results: List of search results to analyze
+            
+        Returns:
+            Dict with content analysis insights
+        """
+        self.logger.info(f"📊 Analyzing content for {len(results)} results")
+        return self.content_analysis.analyze_content(results)
+    
+    def score_quality(self, content: str, title: str = "", domain: str = "") -> Dict:
+        """
+        Score the quality of individual content
+        
+        Args:
+            content: Content text to analyze
+            title: Title of the content
+            domain: Domain of the source
+            
+        Returns:
+            Dict with quality score and factors
+        """
+        self.logger.info(f"⭐ Scoring quality for content: '{title[:50]}'")
+        return self.content_analysis.score_quality(content, title, domain)
+    
+    def rerank_results(self, results: List[Dict], query: str) -> Dict:
+        """
+        Rerank results based on content analysis and query relevance
+        
+        Args:
+            results: Original search results
+            query: Search query for relevance scoring
+            
+        Returns:
+            Dict with reranked results and ranking factors
+        """
+        self.logger.info(f"📈 Reranking {len(results)} results for query: '{query}'")
+        return self.content_analysis.rerank_results(results, query)
+    
+    def detect_duplicates(self, results: List[Dict]) -> Dict:
+        """
+        Detect duplicate or near-duplicate results
+        
+        Args:
+            results: List of results to check for duplicates
+            
+        Returns:
+            Dict with duplicate detection results
+        """
+        self.logger.info(f"🔍 Detecting duplicates in {len(results)} results")
+        return self.content_analysis.detect_duplicates(results)
+    
+    def generate_insights(self, query: str, results: List[Dict]) -> Dict:
+        """
+        Generate comprehensive insights combining query and content analysis
+        
+        Args:
+            query: Search query
+            results: Search results
+            
+        Returns:
+            Dict with comprehensive insights
+        """
+        start_time = time.time()
+        
+        try:
+            self.logger.info(f"🧠 Generating comprehensive insights for '{query}' with {len(results)} results")
+            
+            # Parallel analysis
+            query_enhancement = self.enhance_query(query)
+            intent_classification = self.classify_intent(query)
+            entity_extraction = self.extract_entities(query)
+            content_analysis = self.analyze_content(results)
+            
+            # Combine insights
+            insights = {
+                'query_analysis': {
+                    'original_query': query,
+                    'enhanced_query': query_enhancement.get('enhanced_query', query),
+                    'primary_intent': intent_classification.get('primary_intent', 'general'),
+                    'intent_confidence': intent_classification.get('confidence', 0.0),
+                    'detected_entities': entity_extraction.get('entities', {}),
+                    'suggestions': query_enhancement.get('suggestions', [])
+                },
+                'content_insights': content_analysis.get('insights', []),
+                'quality_overview': content_analysis.get('quality_distribution', {}),
+                'content_types': content_analysis.get('content_types', {}),
+                'authority_signals': content_analysis.get('authority_signals', {}),
+                'recommendations': self._generate_search_recommendations(
+                    query_enhancement, intent_classification, content_analysis
+                ),
+                'processing_time_ms': round((time.time() - start_time) * 1000, 2)
+            }
+            
+            self.logger.info(f"✅ Comprehensive insights generated in {insights['processing_time_ms']}ms")
+            return insights
+            
+        except Exception as e:
+            self.logger.error(f"Insight generation failed: {e}")
+            return {
+                'query_analysis': {'original_query': query},
+                'content_insights': [],
+                'quality_overview': {},
+                'content_types': {},
+                'authority_signals': {},
+                'recommendations': [],
+                'processing_time_ms': round((time.time() - start_time) * 1000, 2),
+                'error': str(e)
+            }
+    
+    def _generate_search_recommendations(self, query_enhancement: Dict, 
+                                       intent_classification: Dict, 
+                                       content_analysis: Dict) -> List[str]:
+        """Generate search recommendations based on analysis"""
+        recommendations = []
+        
+        # Query-based recommendations
+        if query_enhancement.get('suggestions'):
+            recommendations.append(
+                f"Try searching: {query_enhancement['suggestions'][0]}"
+            )
+        
+        # Intent-based recommendations
+        intent = intent_classification.get('primary_intent', '')
+        if intent == 'tutorial' and content_analysis.get('content_types', {}).get('documentation', 0) > 0:
+            recommendations.append("Consider official documentation for comprehensive guides")
+        elif intent == 'troubleshooting':
+            recommendations.append("Check community forums for similar issues")
+        
+        # Quality-based recommendations
+        quality_dist = content_analysis.get('quality_distribution', {})
+        if quality_dist.get('low_quality_count', 0) > quality_dist.get('high_quality_count', 0):
+            recommendations.append("Refine your search terms for higher quality results")
+        
+        return recommendations[:3]  # Limit to 3 recommendations

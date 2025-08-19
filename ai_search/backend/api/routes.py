@@ -20,6 +20,7 @@ from utils.helpers import Logger
 from .models import *
 # Import the new, streamlined set of services
 from ..core.enhanced_search_service import EnhancedSearchService
+from ..core.opensearch_service import OpenSearchService
 from ..core.ai_client_service import AIClientService
 
 logger = Logger.setup_logger("backend.api.routes")
@@ -39,18 +40,23 @@ def get_services():
     # Using a simple singleton pattern to ensure services are created only once.
     if not hasattr(get_services, '_services'):
         logger.info("🚀 Initializing core services...")
-        search_service = EnhancedSearchService()
         
-        # Get AI Runner URL from environment variable
+        # Initialize OpenSearchService first
+        opensearch_service = OpenSearchService()
+        
+        # Get AI Runner URL from environment variable and initialize AI service
         ai_runner_url = os.getenv("AI_RUNNER_URL", "http://127.0.0.1:8001")
-        logger.info(f"🤖 AI Runner URL: {ai_runner_url}")
+        logger.info(f"� AI Intelligence Hub URL: {ai_runner_url}")
         ai_service = AIClientService(ai_runner_url=ai_runner_url)
+        
+        # Initialize EnhancedSearchService with both OpenSearch and AI services
+        search_service = EnhancedSearchService(opensearch_service, ai_service)
         
         get_services._services = {
             'search': search_service,
             'ai': ai_service
         }
-        logger.info("✅ Core services initialized successfully.")
+        logger.info("✅ Core services initialized with AI Intelligence Hub integration.")
     
     return get_services._services
 
@@ -60,6 +66,9 @@ def get_services():
 async def parallel_search(
     q: str = Query(..., min_length=1, max_length=500, description="Search query"),
     limit: Optional[int] = Query(10, ge=1, le=50, description="Maximum number of results"),
+    offset: Optional[int] = Query(0, ge=0, description="Offset for pagination"),
+    enable_ai_enhancement: Optional[bool] = Query(True, description="Enable AI Intelligence Hub features"),
+    enable_cache: Optional[bool] = Query(True, description="Enable search result caching"),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """
@@ -71,8 +80,13 @@ async def parallel_search(
         start_time = time.time()
         services = get_services()
         
-        # 1. Perform instant search using the single, powerful search service
-        search_result = services['search'].search(query=q, limit=limit)
+        # 1. Perform instant search using the enhanced search service with AI capabilities
+        search_result = services['search'].search(
+            query=q, 
+            limit=limit, 
+            enable_cache=enable_cache, 
+            enable_ai_enhancement=enable_ai_enhancement
+        )
         
         if search_result.get('error'):
             raise HTTPException(status_code=400, detail=f"Search failed: {search_result['error']}")
@@ -91,9 +105,9 @@ async def parallel_search(
         
         # 3. Return instant search results
         search_result['ai_summary_request_id'] = ai_request_id
-        search_result['total_time_ms'] = round((time.time() - start_time) * 1000, 2)
+        search_result['total_time_ms'] = search_result.get('response_time_ms', 0)  # Map new field to old field name for compatibility
         
-        logger.info(f"Parallel search for '{q}': {search_result['total_found']} results in {search_result['total_time_ms']}ms. AI task ID: {ai_request_id[:8]}")
+        logger.info(f"Parallel search for '{q}': {search_result['total_results']} results in {search_result['total_time_ms']}ms. AI task ID: {ai_request_id[:8]}")
         
         return search_result
         
@@ -175,6 +189,92 @@ async def generate_ai_summary_background(query: str, results: list, request_id: 
         await notify_websocket_error(request_id, str(e))
         await close_websocket_connection(request_id)
         logger.error(f"AI summary failed for '{query}': {e}")
+
+# === AI INTELLIGENCE HUB ENDPOINTS ===
+
+@router.post("/ai/enhance-query")
+async def enhance_query_endpoint(request: AIQueryEnhanceRequest):
+    """Enhance query with AI intelligence"""
+    try:
+        services = get_services()
+        result = services['ai'].enhance_query(request.query)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Query enhancement failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Query enhancement failed: {str(e)}")
+
+@router.post("/ai/classify-intent")
+async def classify_intent_endpoint(request: AIIntentClassifyRequest):
+    """Classify search intent"""
+    try:
+        services = get_services()
+        result = services['ai'].classify_intent(request.query)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Intent classification failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Intent classification failed: {str(e)}")
+
+@router.post("/ai/extract-entities")
+async def extract_entities_endpoint(request: AIEntityExtractionRequest):
+    """Extract entities from query"""
+    try:
+        services = get_services()
+        result = services['ai'].extract_entities(request.query)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Entity extraction failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Entity extraction failed: {str(e)}")
+
+@router.post("/ai/analyze-content")
+async def analyze_content_endpoint(request: AIContentAnalysisRequest):
+    """Analyze content of search results"""
+    try:
+        services = get_services()
+        result = services['ai'].analyze_content(request.results)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Content analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Content analysis failed: {str(e)}")
+
+@router.post("/ai/score-quality")
+async def score_quality_endpoint(request: AIQualityScoringRequest):
+    """Score content quality"""
+    try:
+        services = get_services()
+        result = services['ai'].score_quality(request.content, request.title, request.domain)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Quality scoring failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Quality scoring failed: {str(e)}")
+
+@router.post("/ai/rerank-results")
+async def rerank_results_endpoint(request: AIRerankingRequest):
+    """Rerank results based on AI analysis"""
+    try:
+        services = get_services()
+        result = services['ai'].rerank_results(request.results, request.query)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Result reranking failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Result reranking failed: {str(e)}")
+
+@router.post("/ai/generate-insights")
+async def generate_insights_endpoint(request: AIInsightsRequest):
+    """Generate comprehensive insights"""
+    try:
+        services = get_services()
+        result = services['ai'].generate_insights(request.query, request.results)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Insights generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Insights generation failed: {str(e)}")
 
 @router.websocket("/ws/summary/{request_id}")
 async def websocket_ai_summary(websocket: WebSocket, request_id: str):

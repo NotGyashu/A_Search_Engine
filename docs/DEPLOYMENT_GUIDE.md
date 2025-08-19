@@ -148,7 +148,7 @@ jobs:
         
     - name: Process Data
       run: |
-        cd ai_search/data_pipeline
+        cd data_pipeline
         python process_crawled_data.py
         
     - name: Upload Database

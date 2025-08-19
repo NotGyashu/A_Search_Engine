@@ -192,7 +192,7 @@ def hybrid_search(query):
 
 1. **Process your crawler data efficiently**:
    ```bash
-   cd ai_search/data_pipeline
+   cd data_pipeline
    python cost_optimizer.py  # Process your 50MB files efficiently
    ```
 

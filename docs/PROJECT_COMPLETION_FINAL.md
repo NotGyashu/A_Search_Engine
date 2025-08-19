@@ -9,7 +9,7 @@ Successfully transformed the fragmented mini search engine project into a **modu
 ### ✅ **Complete Modularization**
 - **✅ Backend**: All search functionality moved to `ai_search/backend/`
 - **✅ Frontend**: React application scaffolded in `ai_search/frontend/`
-- **✅ Data Pipeline**: ETL processes moved to `ai_search/data_pipeline/`
+- **✅ Data Pipeline**: ETL processes moved to `data_pipeline/`
 - **✅ Common**: Shared utilities and config in `ai_search/common/`
 - **✅ Documentation**: Comprehensive docs in `ai_search/docs/`
 
@@ -68,7 +68,7 @@ mini_search_engine/
 - **Features**: Responsive design, real-time search
 
 ### 4. **Data Pipeline**
-- **File**: `ai_search/data_pipeline/processor.py`
+- **File**: `data_pipeline/processor.py`
 - **Features**: Batch processing, deduplication, validation
 - **Output**: Optimized SQLite database
 

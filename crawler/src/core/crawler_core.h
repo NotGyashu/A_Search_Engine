@@ -155,6 +155,5 @@ extern std::condition_variable shutdown_coordinator_cv;
 extern std::mutex shutdown_coordinator_mutex;
 
 // Cleanup functions for proper shutdown order
-void cleanup_global_components();
 void coordinated_shutdown();
 void cleanup_components_safely();

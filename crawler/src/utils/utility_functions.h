@@ -6,7 +6,6 @@
 
 // Utility functions
 std::string base64_encode(const std::string& in);
-std::string get_timestamp_string();
 std::string sanitize_filename(const std::string& input);
 
 // Date parsing functions

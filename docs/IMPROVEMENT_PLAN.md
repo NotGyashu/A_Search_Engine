@@ -38,7 +38,7 @@
 
 #### 1.1 Add Language Detection to Data Pipeline
 ```python
-# ai_search/data_pipeline/language_detector.py
+# data_pipeline/language_detector.py
 import langdetect
 from typing import Optional
 
@@ -61,7 +61,7 @@ class LanguageDetector:
 
 #### 1.2 Enhanced Content Quality Scoring
 ```python
-# ai_search/data_pipeline/quality_scorer.py
+# data_pipeline/quality_scorer.py
 class ContentQualityScorer:
     def calculate_quality_score(self, content: str, url: str) -> float:
         score = 0.0

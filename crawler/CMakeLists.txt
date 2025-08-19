@@ -35,8 +35,7 @@ pkg_check_modules(RE2 REQUIRED re2)
 # Load submodule include helper
 include(${CMAKE_SOURCE_DIR}/cmake/IncludeGitSubmodule.cmake)
 
-# SQLite3 dependency
-pkg_check_modules(SQLITE3 REQUIRED sqlite3)
+
 
 # TinyXML2 dependency for XML parsing
 pkg_check_modules(TINYXML2 REQUIRED tinyxml2)
@@ -142,7 +141,6 @@ target_link_libraries(crawler PRIVATE
     # FIX: Link the concurrentqueue library. This automatically adds its include directory.
     concurrentqueue
     ${CURL_LIBRARIES}
-    ${SQLITE3_LIBRARIES}
     ${TINYXML2_LIBRARIES}
     pthread
     stdc++fs

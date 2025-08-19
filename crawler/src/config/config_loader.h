@@ -25,17 +25,6 @@ struct FeedConfig {
         : url(u), poll_interval_minutes(interval), priority(p) {}
 };
 
-/**
- * Sitemap configuration structure
- */
-struct SitemapConfig {
-    std::string url;
-    int parse_interval_hours;
-    int priority;
-    
-    SitemapConfig(const std::string& u = "", int interval = 24, int p = 8) 
-        : url(u), parse_interval_hours(interval), priority(p) {}
-};
 
 /**
  * Load seed URLs from JSON file

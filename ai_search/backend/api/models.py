@@ -100,3 +100,38 @@ class ErrorResponse(BaseModel):
     error_code: str
     timestamp: datetime = Field(default_factory=datetime.now)
     details: Optional[Dict[str, Any]] = None
+
+
+# === AI INTELLIGENCE HUB MODELS ===
+
+class AIQueryEnhanceRequest(BaseModel):
+    """AI query enhancement request"""
+    query: str = Field(..., min_length=1, description="Query to enhance")
+
+class AIIntentClassifyRequest(BaseModel):
+    """AI intent classification request"""
+    query: str = Field(..., min_length=1, description="Query to classify")
+
+class AIEntityExtractionRequest(BaseModel):
+    """AI entity extraction request"""
+    query: str = Field(..., min_length=1, description="Query to extract entities from")
+
+class AIContentAnalysisRequest(BaseModel):
+    """AI content analysis request"""
+    results: List[Dict] = Field(..., description="Search results to analyze")
+
+class AIQualityScoringRequest(BaseModel):
+    """AI quality scoring request"""
+    content: str = Field(..., description="Content to score")
+    title: Optional[str] = Field("", description="Content title")
+    domain: Optional[str] = Field("", description="Content domain")
+
+class AIRerankingRequest(BaseModel):
+    """AI result reranking request"""
+    results: List[Dict] = Field(..., description="Results to rerank")
+    query: str = Field(..., min_length=1, description="Original query")
+
+class AIInsightsRequest(BaseModel):
+    """AI comprehensive insights request"""
+    query: str = Field(..., min_length=1, description="Search query")
+    results: List[Dict] = Field(..., description="Search results")

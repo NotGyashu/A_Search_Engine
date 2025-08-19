@@ -1,7 +1,0 @@
-trafilatura
-beautifulsoup4
-elasticsearch
-python-dotenv
-lxml
-requests
-tqdm

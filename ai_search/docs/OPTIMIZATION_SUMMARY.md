@@ -85,19 +85,19 @@ Main Process → [File Paths] → Independent Workers → Concurrent Indexing
 
 1. **Install dependencies**:
    ```bash
-   chmod +x ai_search/data_pipeline/install_optimization_deps.sh
-   ./ai_search/data_pipeline/install_optimization_deps.sh
+   chmod +x data_pipeline/install_optimization_deps.sh
+   ./data_pipeline/install_optimization_deps.sh
    ```
 
 2. **Run optimized pipeline**:
    ```bash
-   python ai_search/data_pipeline/cnvt_raw_into_db.py
+   python data_pipeline/cnvt_raw_into_db.py
    ```
 
 3. **Monitor performance**:
    ```bash
    # Optional: Profile with py-spy
-   py-spy record -o profile.svg -- python ai_search/data_pipeline/cnvt_raw_into_db.py
+   py-spy record -o profile.svg -- python data_pipeline/cnvt_raw_into_db.py
    ```
 
 ## 🎯 Quality Improvements
