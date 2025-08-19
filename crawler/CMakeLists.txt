@@ -24,22 +24,45 @@ set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-Wl,--gc-sections")
 # Debug flags
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG -fsanitize=address -mavx2 -mfma")
 
+# --- MODIFICATION START: Cross-platform dependency resolution ---
 
 # Dependencies
 find_package(CURL REQUIRED)
 find_package(PkgConfig REQUIRED)
-find_package(RocksDB REQUIRED)
-pkg_check_modules(RE2 REQUIRED re2)
 
+# --- Find RocksDB in a cross-platform way ---
+# Give precedence to a user-defined environment variable as an override
+IF(DEFINED ENV{ROCKSDB_ROOT})
+    LIST(APPEND CMAKE_PREFIX_PATH "$ENV{ROCKSDB_ROOT}")
+ENDIF()
+
+# Add platform-specific hints for standard installation locations
+IF(UNIX AND NOT APPLE) # For Linux systems (including WSL)
+    # Standard path for librocksdb-dev on Ubuntu/Debian
+    IF(EXISTS "/usr/lib/x86_64-linux-gnu/cmake/RocksDB")
+        LIST(APPEND CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/cmake/RocksDB")
+    ENDIF()
+ELSEIF(APPLE) # For macOS systems
+    # Standard paths for RocksDB installed via Homebrew
+    IF(EXISTS "/opt/homebrew/opt/rocksdb/lib/cmake/rocksdb")
+        LIST(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/rocksdb/lib/cmake/rocksdb")
+    ENDIF()
+    IF(EXISTS "/usr/local/opt/rocksdb/lib/cmake/rocksdb")
+        LIST(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/rocksdb/lib/cmake/rocksdb")
+    ENDIF()
+ENDIF()
+
+# Now, find the package using the hints we've provided
+find_package(RocksDB REQUIRED)
+# --- MODIFICATION END ---
+
+pkg_check_modules(RE2 REQUIRED re2)
 
 # Load submodule include helper
 include(${CMAKE_SOURCE_DIR}/cmake/IncludeGitSubmodule.cmake)
 
-
-
 # TinyXML2 dependency for XML parsing
 pkg_check_modules(TINYXML2 REQUIRED tinyxml2)
-
 
 # Include additional Git submodules (header-only)
 # This will make the 'concurrentqueue' target available
@@ -74,25 +97,25 @@ set(SOURCES
     src/core/crawler_workers.cpp
     src/core/crawler_modes.cpp
     src/core/crawler_monitoring.cpp
-    
+
     # Configuration management
     src/config/config_loader.cpp
     src/config/domain_config.cpp
     src/config/domain_blacklist.cpp
-    
+
     # Network layer
     src/network/http_client.cpp
     src/network/connection_pool.cpp
     src/network/rate_limiter.cpp
     src/network/robots_txt_cache.cpp
     src/network/conditional_get.cpp
-    
+
     # Queue management
     src/queue/sharded_disk_queue.cpp
     src/queue/work_stealing_queue.cpp
     src/queue/html_processing_queue.cpp
     src/queue/smart_frontier.cpp
-    
+
     # Parsing and content processing
     src/parsing/ultra_parser.cpp
     src/parsing/language_detector.cpp
@@ -100,15 +123,15 @@ set(SOURCES
     src/parsing/html_document.cpp
     src/parsing/rss_poller.cpp
     src/parsing/sitemap_parser.cpp
-    
+
     # Storage layer
     src/storage/enhanced_storage.cpp
-    
+
     # Monitoring and logging
     src/monitoring/performance_monitor.cpp
     src/monitoring/error_tracker.cpp
-     src/storage/crawl_metadata.cpp
-    
+    src/storage/crawl_metadata.cpp
+
     # Utility functions
     src/utils/url_normalizer.cpp
     src/utils/utility_functions.cpp
@@ -133,7 +156,7 @@ target_include_directories(crawler PRIVATE
     ${PROJECT_SOURCE_DIR}/src/utils
     ${PROJECT_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/third_party/tracy/public
-     ${RE2_INCLUDE_DIRS}
+    ${RE2_INCLUDE_DIRS}
 )
 
 # Linking for modular crawler
@@ -146,9 +169,7 @@ target_link_libraries(crawler PRIVATE
     stdc++fs
     RocksDB::rocksdb
     ${RE2_LIBRARIES}
-
 )
-
 
 # Install targets
 install(TARGETS crawler DESTINATION bin)
@@ -170,3 +191,4 @@ add_custom_target(build-crawler
     COMMAND ${CMAKE_COMMAND} --build . --target crawler
     COMMENT "Building modular crawler"
 )
+
