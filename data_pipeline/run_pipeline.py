@@ -28,13 +28,30 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "500"))
 MIN_CONTENT_LENGTH = int(os.getenv("MIN_CONTENT_LENGTH", "150"))
 MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", "2000"))
 
-# Logging configuration
+# --- MODIFIED Logging Configuration ---
+# Define log file path and rotation parameters
+LOG_FILE = "data_pipeline.log"
+MAX_LOG_SIZE_MB = 100  # Max size of a single log file in MB
+LOG_BACKUP_COUNT = 0   # Number of old log files to keep
+
+# Create a rotating file handler
+# maxBytes is in bytes, so we convert MB to bytes
+rotating_handler = RotatingFileHandler(
+    LOG_FILE, 
+    maxBytes=MAX_LOG_SIZE_MB * 1024 * 1024, 
+    backupCount=LOG_BACKUP_COUNT
+)
+
+# Create a formatter and set it for the handler
+log_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+rotating_handler.setFormatter(log_formatter)
+
+# Configure the root logger
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=os.getenv('LOG_LEVEL', 'INFO').upper(), # Get level from environment
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("data_pipeline.log")
+        logging.StreamHandler(), # Keep logging to the console
+        rotating_handler         # Add the rotating file handler
     ]
 )
 
