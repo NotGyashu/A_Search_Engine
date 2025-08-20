@@ -6,6 +6,7 @@ to OpenSearch with advanced features for better search results.
 """
 
 import logging
+from logging.handlers import RotatingFileHandler
 import multiprocessing
 import time
 from pathlib import Path
