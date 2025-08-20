@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
-
+from bs4 import BeautifulSoup
 from extractor import ContentExtractor
 from cleaner import ContentCleaner
 from scorer import ContentScorer
@@ -24,18 +24,18 @@ from enhanced_metadata_extractor import EnhancedMetadataExtractor
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(slots=True)
 class Document:
-    """Represents the metadata for a single document."""
+    """Represents the metadata for a single document (optimized)."""
+   
     document_id: str
     url: str
     title: str
     domain: str
-    description: str  # Consolidated from text_snippet and original_meta_description
+    description: str
     content_type: str
     categories: List[str]
-    keywords: List[str]  # Consolidated from keywords and original_keywords
-    # Enhanced metadata fields
+    keywords: List[str]
     canonical_url: Optional[str] = None
     published_date: Optional[str] = None
     modified_date: Optional[str] = None
@@ -47,9 +47,10 @@ class Document:
     icons: Optional[Dict[str, str]] = None
 
 
-@dataclass
+@dataclass(slots=True)
 class DocumentChunk:
-    """Represents an indexable chunk of a document."""
+    """Represents an indexable chunk of a document (optimized)."""
+
     chunk_id: str
     document_id: str
     text_chunk: str
@@ -64,8 +65,8 @@ class DocumentChunk:
 class DocumentProcessor:
     """Advanced document processing with modular components."""
     
-    def __init__(self, min_content_length: int = 600, max_chunk_size: int = 2000):
-        self.min_content_length = min_content_length  # Increased from 400 to 600 for even better quality
+    def __init__(self, min_content_length: int = 400, max_chunk_size: int = 2000):
+        self.min_content_length = min_content_length  # Reduced from 600 to 400 for better coverage
         self.max_chunk_size = max_chunk_size
         
         # Initialize processing modules with improved settings
@@ -79,15 +80,10 @@ class DocumentProcessor:
             'processed_count': 0,
             'successful_count': 0,
             'failed_count': 0,
-            'low_quality_count': 0,
-            'duplicate_count': 0,
-            'total_chunks': 0,
-            'high_quality_chunks': 0,
             'skipped_count': 0,
             'total_processing_time': 0,
-            'language_filtered': 0,
             'content_too_short': 0,
-            'extraction_failed': 0
+            'language_filtered': 0
         }
     
     def _score_description_quality(self, description: str, source_type: str) -> float:
@@ -184,23 +180,31 @@ class DocumentProcessor:
                 self.stats['skipped_count'] += 1
                 return None
             
-            if not LanguageDetector.is_english(html_content, url):
-                # Step 2.5: Language filtering using the proven original method
-                if not LanguageDetector.is_english(html_content, url):
-                    logger.debug(f"Skipping {url}: Not English content")
-                    self.stats['language_filtered'] += 1
-                    return None
-
-            if len(html_content) < 50:  # Basic length check instead
-                logger.debug(f"Skipping {url}: Content too short ({len(html_content)} chars)")
+            # Step 2: Early content size filtering (before expensive operations)
+            if len(html_content) < 500:  # Quick pre-filter
+                logger.debug(f"Skipping {url}: HTML too short ({len(html_content)} chars)")
                 self.stats['content_too_short'] += 1
                 return None
-            
-            # Step 3: HTML parsing and content extraction (simplified)
-            extracted_data = self.extractor.extract_content(html_content, url, raw_doc)
-            
-            # Step 3.5: Enhanced metadata extraction
-            enhanced_metadata = self.enhanced_extractor.extract_enhanced_metadata(html_content, url)
+                
+            # Step 2.5: Language filtering (optimized)
+            if not LanguageDetector.is_english(html_content, url):
+                self.stats['language_filtered'] += 1
+                return None            # Step 3: Single-pass HTML parsing and extraction (optimized)
+            # Parse HTML once and reuse for both content and metadata extraction
+            soup = None
+            try:
+                soup = BeautifulSoup(html_content, "lxml")
+            except Exception as e:
+                logger.warning(f"Failed to parse HTML for {url}: {e}")
+                
+            extracted_data = self.extractor.extract_content(html_content, url, raw_doc, soup=soup if soup else None)
+            enhanced_metadata = self.enhanced_extractor.extract_enhanced_metadata(html_content, url, soup=soup if soup else None)
+
+            # Check if extraction failed completely
+            if not extracted_data or not extracted_data.get('main_content'):
+                logger.debug(f"Skipping {url}: Content extraction failed")
+                self.stats['skipped_count'] += 1
+                return None
             
             main_content = extracted_data.get('main_content', '')
             code_blocks = extracted_data.get('code_blocks', [])
@@ -210,38 +214,48 @@ class DocumentProcessor:
                 self.stats['content_too_short'] += 1
                 return None
             
-            # Use enhanced metadata for all document fields
-            json_ld_data = enhanced_metadata.get('structured_data', {}).get('json_ld', [])
-            microdata = enhanced_metadata.get('structured_data', {}).get('microdata', [])
-            open_graph = enhanced_metadata.get('structured_data', {}).get('open_graph', {})
+            # Step 4: Optimized metadata consolidation (single pass)
+            metadata = enhanced_metadata.get('structured_data', {})
+            page_meta = enhanced_metadata.get('page_metadata', {})
             
-            # FIXED: Proper title extraction hierarchy
-            crawler_title = raw_doc.get('title', '')
-            # Filter out "N/A" and other invalid titles from crawler
-            if crawler_title in ['N/A', 'n/a', 'None', 'null', '']:
-                crawler_title = ''
+            # Build consolidated metadata dict once
+            all_metadata = {
+                'og_title': metadata.get('open_graph', {}).get('title'),
+                'og_description': metadata.get('open_graph', {}).get('description'),
+                'meta_title': page_meta.get('title'),
+                'meta_description': page_meta.get('description'),
+                'json_ld': metadata.get('json_ld', []),
+                'microdata': metadata.get('microdata', [])
+            }
             
+            # Extract JSON-LD data once
+            json_ld_title = json_ld_description = None
+            if all_metadata['json_ld']:
+                first_item = all_metadata['json_ld'][0]
+                json_ld_title = first_item.get('headline')
+                json_ld_description = first_item.get('description')
+            
+            # Extract microdata once
+            microdata_title = microdata_description = None
+            if all_metadata['microdata']:
+                first_item = all_metadata['microdata'][0]
+                microdata_title = first_item.get('headline')
+                microdata_description = first_item.get('description')
+            
+            # Title selection (optimized hierarchy)
+            crawler_title = raw_doc.get('title', '') if raw_doc.get('title') not in ['N/A', 'n/a', 'None', 'null', ''] else ''
             title = (
-                # 1. First priority: Open Graph title (og:title) - most reliable for sharing
-                open_graph.get('title') or
-                # 2. Second priority: JSON-LD headline
-                (json_ld_data[0].get('headline') if json_ld_data else None) or
-                # 3. Third priority: Microdata headline  
-                (microdata[0].get('headline') if microdata else None) or
-                # 4. Fourth priority: Meta title or page title from HTML <title> tag
-                enhanced_metadata.get('page_metadata', {}).get('title', '') or
-                # 5. Last resort: Raw doc title from crawler (if valid)
-                crawler_title or
-                # 6. Fallback only if everything else fails
+                all_metadata['og_title'] or 
+                json_ld_title or 
+                microdata_title or 
+                all_metadata['meta_title'] or 
+                crawler_title or 
                 "Untitled Document"
             )
             
-            # Clean and validate the title
-            if title and title.strip():
+            # Clean and validate title
+            if title and title.strip() and not self._is_generic_title(title) and len(title) >= 3:
                 title = title.strip()
-                # Only mark as untitled if it's actually generic/empty
-                if self._is_generic_title(title) or len(title) < 3:
-                    title = "Untitled Document"
             else:
                 title = "Untitled Document"
                 
@@ -259,67 +273,41 @@ class DocumentProcessor:
                 self.stats['content_too_short'] += 1
                 return None
             
-            # Step 7.5: Enhanced description consolidation with better preservation
-            page_meta = enhanced_metadata.get('page_metadata', {})
-            structured_data = enhanced_metadata.get('structured_data', {})
+            # Step 5: Optimized description selection
+            descriptions = [
+                (all_metadata['og_description'], 'og_description', 2.5),
+                (all_metadata['meta_description'], 'meta_description', 2.0),
+                (json_ld_description, 'json_ld_description', 1.5),
+                (microdata_description, 'microdata_description', 1.0)
+            ]
             
-            # Extract all available descriptions for better fallback
-            descriptions = {
-                'og_description': structured_data.get('rdfa', [{}])[0].get('og:description') if structured_data.get('rdfa') else None,
-                'meta_description': page_meta.get('description'),
-                'json_ld_description': None,
-                'microdata_description': None
-            }
-            
-            # Extract from JSON-LD
-            json_ld_data = structured_data.get('json_ld', [])
-            for item in json_ld_data:
-                if 'description' in item:
-                    descriptions['json_ld_description'] = item['description']
-                    break
-            
-            # Extract from microdata
-            microdata = structured_data.get('microdata', [])
-            for item in microdata:
-                if 'description' in item:
-                    descriptions['microdata_description'] = item['description']
-                    break
-            
-            # Enhanced description selection with quality scoring
             best_description = None
             best_score = 0
             
-            for desc_type, desc_value in descriptions.items():
-                if desc_value and isinstance(desc_value, str) and len(desc_value.strip()) > 10:
-                    # Score descriptions based on quality indicators
-                    score = self._score_description_quality(desc_value, desc_type)
+            for desc_value, desc_type, base_score in descriptions:
+                if desc_value and len(desc_value.strip()) > 10:
+                    # Simplified scoring (faster)
+                    length = len(desc_value)
+                    score = base_score
+                    if 120 <= length <= 300:
+                        score += 2.0
+                    elif 80 <= length <= 400:
+                        score += 1.0
+                    
                     if score > best_score:
                         best_score = score
                         best_description = desc_value.strip()
             
-            # Final description decision
+            # Final description
             if best_description:
                 description = self.cleaner._clean_snippet_text(best_description)
-                logger.debug(f"Using authored description from {url} (score: {best_score:.2f})")
             else:
                 description = self.cleaner.create_description(cleaned_content)
-                logger.debug(f"Generated description for {url} (no authored description found)")
             
-            # Step 7.6: Enhanced keywords consolidation with debugging
-            # Get original keywords from meta tags (author-provided)
+            # Step 6: Optimized keywords processing
             original_keywords = page_meta.get('keywords', [])
-            
-            # Log metadata extraction success for debugging
-            if original_keywords:
-                logger.debug(f"Preserved {len(original_keywords)} original keywords from {url}")
-            
-            if page_meta.get('description'):
-                logger.debug(f"Preserved original meta description from {url}")
-            
-            # Generate additional keywords from content
             generated_keywords = self.cleaner.extract_keywords(cleaned_content)
-            # Combine with priority to original keywords
-            combined_keywords = self.cleaner.combine_keywords(original_keywords, generated_keywords, max_keywords=12)  # Increased limit
+            combined_keywords = self.cleaner.combine_keywords(original_keywords, generated_keywords, max_keywords=10)
             
             # Step 8: Content analysis and scoring (using enhanced metadata)
             content_type = self._determine_content_type(url, enhanced_metadata)
@@ -345,11 +333,10 @@ class DocumentProcessor:
                 url=url,
                 title=title,
                 domain=domain,
-                description=description,  # Consolidated field
+                description=description,
                 content_type=content_type,
-                categories=categories,
-                keywords=combined_keywords,  # Already limited to 10 in combine_keywords
-                # Enhanced metadata
+                categories=categories[:3],  # Limit categories
+                keywords=combined_keywords,
                 canonical_url=enhanced_metadata.get('canonical_url'),
                 published_date=enhanced_metadata.get('published_date'),
                 modified_date=enhanced_metadata.get('modified_date'),
@@ -361,15 +348,9 @@ class DocumentProcessor:
                 icons=page_meta.get('icons')
             )
             
-            # Step 10: Enhanced content chunking with improved content preservation
-            text_chunks = self.cleaner.intelligent_chunking(
-                cleaned_content, 
-                preserve_context=True, 
-                html_content=html_content,
-                content_importance_threshold=0.25  # Lower threshold to preserve more content
-            )
+            # Step 8: Optimized chunking (reduced overhead)
+            text_chunks = self.cleaner.intelligent_chunking(cleaned_content, preserve_context=True)
             if not text_chunks:
-                logger.debug(f"Skipping {url}: No valid chunks created")
                 self.stats['content_too_short'] += 1
                 return None
             
@@ -384,7 +365,6 @@ class DocumentProcessor:
                     quality_chunks.append(chunk)
             
             if not quality_chunks:
-                logger.debug(f"Skipping {url}: No chunks meet minimum quality requirements")
                 self.stats['content_too_short'] += 1
                 return None
             
@@ -414,7 +394,7 @@ class DocumentProcessor:
                     text_chunk=chunk,
                     headings=formatted_headings,
                     domain_score=domain_score,
-                    quality_score=chunk_quality_score,  # Use individual chunk quality score
+                    quality_score=chunk_quality_score,
                     word_count=chunk_word_count,
                     content_categories=categories,
                     keywords=chunk_combined_keywords
@@ -426,16 +406,15 @@ class DocumentProcessor:
             self.stats['successful_count'] += 1
             self.stats['total_processing_time'] += processing_time
             
-            raw_size_kb = len(html_content.encode("utf-8")) / 1024
-            clean_size_kb = len(cleaned_content.encode("utf-8")) / 1024
-            
-            logger.info(
-                f"[PROCESSED] {url} | "
-                f"Raw: {raw_size_kb:.1f}KB → Clean: {clean_size_kb:.1f}KB → "
-                f"Chunks: {len(text_chunks)} | "
-                f"Quality: {quality_score:.2f} | "
-                f"Time: {processing_time:.2f}s"
-            )
+            # Reduced logging frequency (only for significant documents)
+            if len(quality_chunks) > 5 or processing_time > 2.0:
+                raw_size_kb = len(html_content.encode("utf-8")) / 1024
+                clean_size_kb = len(cleaned_content.encode("utf-8")) / 1024
+                logger.info(
+                    f"[PROCESSED] {url} | "
+                    f"Raw: {raw_size_kb:.1f}KB → Clean: {clean_size_kb:.1f}KB → "
+                    f"Chunks: {len(quality_chunks)} | Time: {processing_time:.2f}s"
+                )
             
             return {
                 "documents": [asdict(document)],
@@ -706,7 +685,7 @@ class DocumentProcessor:
                 f.write(f"Content Type: {doc.get('content_type', 'N/A')}\n")
                 f.write(f"Categories: {', '.join(doc.get('categories', []))}\n")
                 f.write(f"Keywords: {', '.join(doc.get('keywords', []))}\n")
-                f.write(f"Snippet: {doc.get('text_snippet', 'N/A')[:200]}...\n")
+                f.write(f"Snippet: {doc.get('description', 'N/A')[:200]}...\n")
                 f.write("\n")
                 
                 # Related chunks

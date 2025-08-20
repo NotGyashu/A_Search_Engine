@@ -9,6 +9,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import multiprocessing
 import time
+import warnings
 from pathlib import Path
 from typing import List, Dict, Any
 import os
@@ -17,6 +18,15 @@ from dotenv import load_dotenv
 from file_reader import FileReader
 from processor import DocumentProcessor
 from indexer import OpenSearchIndexer
+
+# Suppress trafilatura warnings globally
+warnings.filterwarnings("ignore", module="trafilatura")
+warnings.filterwarnings("ignore", message="discarding data: None")
+warnings.filterwarnings("ignore", category=UserWarning, module="trafilatura")
+
+# Set trafilatura logger to ERROR level
+trafilatura_logger = logging.getLogger('trafilatura')
+trafilatura_logger.setLevel(logging.ERROR)
 
 # Load environment variables
 load_dotenv()

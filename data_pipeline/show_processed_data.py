@@ -1,7 +1,12 @@
 """
 Enhanced Inspection Pipeline Runner - Process data and save to file for analysis.
 
-This script runs the complete data pipeline but skips the final indexing step.
+This script runs the complete data         # Check if meta description is preserved in snippet
+        orig_desc = doc.get('original_meta_description', '')
+        snippet = doc.get('description', '')
+        if orig_desc and snippet:
+            # Check if original description is used in snippet
+            analysis['meta_description_preserved'] = orig_desc.strip().lower() in snippet.lower()ne but skips the final indexing step.
 Instead, it writes the processed documents and chunks to a local JSON file,
 allowing for detailed quality analysis and debugging.
 
@@ -347,6 +352,10 @@ class InspectionPipeline:
         
         # Generate and save enhanced metadata report
         metadata_report = self.metadata_analyzer.generate_report()
+        
+        # Ensure output directory exists before writing
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
         with open(self.enhanced_metadata_report_path, 'w', encoding='utf-8') as f:
             f.write(metadata_report)
         
@@ -385,7 +394,7 @@ class InspectionPipeline:
                 'url': doc.get('url', 'unknown'),
                 'title': doc.get('title', ''),
                 'original_meta_description': doc.get('original_meta_description'),
-                'text_snippet': doc.get('text_snippet', '')[:200] + '...' if len(doc.get('text_snippet', '')) > 200 else doc.get('text_snippet', ''),
+                'text_snippet': doc.get('description', '')[:200] + '...' if len(doc.get('description', '')) > 200 else doc.get('description', ''),
                 'original_keywords': doc.get('original_keywords', []),
                 'keywords': doc.get('keywords', []),
                 'icons': doc.get('icons', {}),

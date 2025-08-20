@@ -10,14 +10,14 @@ import logging
 from pathlib import Path
 from typing import Generator, Dict, Any, List, Optional
 
-# Import ijson for memory-efficient JSON parsing
+# Import ijson for memory-efficient JSON parsing (required dependency)
 try:
     import ijson
-    HAS_IJSON = True
 except ImportError:
-    HAS_IJSON = False
-    logging.warning("ijson not available - falling back to standard JSON parsing. "
-                   "Install ijson for memory-efficient processing of large files.")
+    raise ImportError(
+        "ijson is required for memory-efficient processing. "
+        "Install it with: pip install ijson"
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,14 @@ class FileReader:
             'files_processed': 0,
             'documents_read': 0,
             'errors_count': 0,
-            'empty_files': 0
+            'empty_files': 0,
+            'validation_errors': 0,
+            'invalid_urls': 0,
+            'missing_content': 0
         }
+        # Validation error tracking (to avoid log flooding)
+        self._validation_error_counts = {}
+        self._log_validation_threshold = 100  # Log every N validation errors
     
     def read_json_file(self, file_path: Path) -> Generator[Dict[str, Any], None, None]:
         """Read JSON or JSONL files with enhanced error handling and validation."""
@@ -66,9 +72,10 @@ class FileReader:
             logger.error(f"Error reading file {file_path}: {e}")
     
     def _read_jsonl(self, file_path: Path) -> Generator[Dict[str, Any], None, None]:
-        """Read JSONL file line by line."""
+        """Read JSONL file line by line with optimized error handling."""
         documents_count = 0
         line_number = 0
+        json_errors = 0
         
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -84,27 +91,26 @@ class FileReader:
                         documents_count += 1
                         yield document
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Invalid JSON on line {line_number} in {file_path}: {e}")
+                    json_errors += 1
+                    # Log only first few JSON errors to avoid flooding
+                    if json_errors <= 5:
+                        logger.warning(f"Invalid JSON on line {line_number} in {file_path}: {e}")
+                    elif json_errors == 6:
+                        logger.warning(f"More JSON decode errors in {file_path} (suppressing further warnings)")
                     continue
                 except Exception as e:
                     logger.error(f"Unexpected error on line {line_number} in {file_path}: {e}")
                     continue
         
+        if json_errors > 5:
+            logger.warning(f"Total JSON decode errors in {file_path}: {json_errors}")
+        
         return documents_count
     
     def _read_json(self, file_path: Path) -> Generator[Dict[str, Any], None, None]:
-        """Read regular JSON file with memory-efficient streaming if possible."""
-        documents_count = 0
-        
-        # Use streaming parser if available and file is large
-        if HAS_IJSON and file_path.stat().st_size > 10 * 1024 * 1024:  # 10MB threshold
-            logger.info(f"Using streaming parser for large file: {file_path}")
-            documents_count = yield from self._read_json_streaming(file_path)
-        else:
-            # Fallback to standard JSON parsing for smaller files
-            documents_count = yield from self._read_json_standard(file_path)
-        
-        return documents_count
+        """Read regular JSON file with memory-efficient streaming."""
+        logger.debug(f"Using streaming parser for: {file_path}")
+        return self._read_json_streaming(file_path)
     
     def _read_json_streaming(self, file_path: Path) -> Generator[Dict[str, Any], None, None]:
         """Memory-efficient streaming JSON parser using ijson."""
@@ -121,71 +127,60 @@ class FileReader:
                         
         except Exception as e:
             logger.error(f"Error streaming JSON file {file_path}: {e}")
-            # Fallback to standard parsing if streaming fails
-            logger.info("Falling back to standard JSON parsing")
-            documents_count = yield from self._read_json_standard(file_path)
-        
-        return documents_count
-    
-    def _read_json_standard(self, file_path: Path) -> Generator[Dict[str, Any], None, None]:
-        """Standard JSON file reading (loads entire file into memory)."""
-        documents_count = 0
-        
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            
-            if isinstance(data, list):
-                for i, document in enumerate(data):
-                    if self._validate_document(document, file_path, i):
-                        documents_count += 1
-                        yield document
-            elif isinstance(data, dict):
-                if self._validate_document(data, file_path, 0):
-                    documents_count = 1
-                    yield data
-            else:
-                logger.error(f"Unexpected JSON structure in {file_path}: expected list or dict")
-        
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in {file_path}: {e}")
-        except Exception as e:
-            logger.error(f"Error reading JSON file {file_path}: {e}")
+            raise  # Don't fallback - fail fast for proper error handling
         
         return documents_count
     
     def _validate_document(self, document: Dict[str, Any], file_path: Path, position: int) -> bool:
-        """Validate document structure and required fields."""
+        """Validate document structure and required fields with reduced logging."""
         if not isinstance(document, dict):
-            logger.warning(f"Invalid document structure at position {position} in {file_path}: not a dict")
+            self.stats['validation_errors'] += 1
+            self._log_validation_error(f"Invalid document structure at position {position} in {file_path}: not a dict")
             return False
         
         # Check required fields
         required_fields = ['url']
         for field in required_fields:
             if field not in document:
-                logger.warning(f"Missing required field '{field}' at position {position} in {file_path}")
+                self.stats['validation_errors'] += 1
+                self._log_validation_error(f"Missing required field '{field}' at position {position} in {file_path}")
                 return False
         
         # Validate URL
         url = document.get('url', '').strip()
         if not url or not self._is_valid_url(url):
-            logger.warning(f"Invalid URL at position {position} in {file_path}: {url}")
+            self.stats['invalid_urls'] += 1
+            self._log_validation_error(f"Invalid URL at position {position} in {file_path}: {url}")
             return False
         
         # Check for content
         if not document.get('content'):
-            logger.debug(f"No content field at position {position} in {file_path}")
+            self.stats['missing_content'] += 1
+            # Don't log missing content as it's often expected
             return False
         
         return True
+    
+    def _log_validation_error(self, message: str):
+        """Log validation errors with throttling to prevent log flooding."""
+        error_key = message.split(':')[0]  # Use error type as key
+        
+        self._validation_error_counts[error_key] = self._validation_error_counts.get(error_key, 0) + 1
+        
+        # Log only the first occurrence and every Nth occurrence
+        count = self._validation_error_counts[error_key]
+        if count == 1 or count % self._log_validation_threshold == 0:
+            if count > 1:
+                logger.warning(f"{message} (occurred {count} times)")
+            else:
+                logger.warning(message)
     
     def _is_valid_url(self, url: str) -> bool:
         """Basic URL validation."""
         return url.startswith(('http://', 'https://')) and len(url) > 10
     
-    def scan_directory(self, directory: Path, recursive: bool = True) -> List[Path]:
-        """Scan directory for supported files."""
+    def scan_directory(self, directory: Path, recursive: bool = True, min_mtime: float = 0) -> List[Path]:
+        """Scan directory for supported files with optional modification time filtering."""
         files = []
         
         try:
@@ -195,7 +190,9 @@ class FileReader:
             
             pattern = "**/*" if recursive else "*"
             for file_path in directory.glob(pattern):
-                if file_path.is_file() and file_path.suffix in self.supported_extensions:
+                if (file_path.is_file() and 
+                    file_path.suffix in self.supported_extensions and
+                    file_path.stat().st_mtime > min_mtime):
                     files.append(file_path)
             
             logger.info(f"Found {len(files)} supported files in {directory}")
@@ -229,15 +226,13 @@ class FileReader:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     return sum(1 for line in f if line.strip())
             else:
-                # For JSON, we need to parse to count
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        return len(data)
-                    elif isinstance(data, dict):
-                        return 1
-                    else:
-                        return 0
+                # For JSON, use streaming counter to avoid loading entire file
+                count = 0
+                with open(file_path, 'rb') as f:
+                    parser = ijson.items(f, 'item')
+                    for _ in parser:
+                        count += 1
+                return count
         except Exception as e:
             logger.warning(f"Could not estimate document count for {file_path}: {e}")
             return 0
@@ -255,8 +250,13 @@ class FileReader:
     
     def get_processing_stats(self) -> Dict[str, Any]:
         """Get file processing statistics."""
+        total_validation_errors = (self.stats['validation_errors'] + 
+                                 self.stats['invalid_urls'] + 
+                                 self.stats['missing_content'])
+        
         return {
             **self.stats,
+            'total_validation_errors': total_validation_errors,
             'success_rate': (
                 (self.stats['files_processed'] - self.stats['errors_count']) / 
                 max(self.stats['files_processed'], 1) * 100
@@ -264,7 +264,8 @@ class FileReader:
             'avg_documents_per_file': (
                 self.stats['documents_read'] / 
                 max(self.stats['files_processed'] - self.stats['empty_files'], 1)
-            )
+            ),
+            'validation_error_types': dict(self._validation_error_counts)
         }
     
     def reset_stats(self):
@@ -273,27 +274,22 @@ class FileReader:
             'files_processed': 0,
             'documents_read': 0,
             'errors_count': 0,
-            'empty_files': 0
+            'empty_files': 0,
+            'validation_errors': 0,
+            'invalid_urls': 0,
+            'missing_content': 0
         }
+        self._validation_error_counts = {}
     
-    def batch_read_files(self, file_paths: List[Path], batch_size: int = 10) -> Generator[List[Dict[str, Any]], None, None]:
-        """Read multiple files in batches for memory efficiency."""
-        current_batch = []
-        
+    def batch_read_files(self, file_paths: List[Path]) -> Generator[List[Dict[str, Any]], None, None]:
+        """Read files one at a time to reduce memory usage (file-based batching)."""
         for file_path in file_paths:
             try:
+                # Process one file at a time and yield all its documents as a batch
                 documents = list(self.read_json_file(file_path))
-                current_batch.extend(documents)
-                
-                # Yield batch when it reaches the desired size
-                if len(current_batch) >= batch_size:
-                    yield current_batch
-                    current_batch = []
+                if documents:  # Only yield non-empty batches
+                    yield documents
                     
             except Exception as e:
                 logger.error(f"Error in batch reading {file_path}: {e}")
                 continue
-        
-        # Yield remaining documents
-        if current_batch:
-            yield current_batch

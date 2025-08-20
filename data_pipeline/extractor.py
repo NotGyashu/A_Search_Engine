@@ -7,11 +7,17 @@ optimized parsing libraries with fallback mechanisms.
 
 import logging
 import re
+import warnings
 from typing import Optional, Dict, Any, List
 from lxml import html as lxml_html
 import trafilatura
 from trafilatura import extract
 from trafilatura.settings import use_config
+
+# Suppress trafilatura warnings for cleaner logs
+trafilatura_logger = logging.getLogger('trafilatura')
+trafilatura_logger.setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", module="trafilatura")
 
 logger = logging.getLogger(__name__)
 
@@ -29,271 +35,167 @@ class ContentExtractor:
     ]
 
     def __init__(self):
-        # Configure trafilatura for optimal extraction
+        # Configure trafilatura for optimal extraction with more lenient settings
         self.config = use_config()
         self.config.set("DEFAULT", "EXTRACTION_TIMEOUT", "30")
-        self.config.set("DEFAULT", "MIN_EXTRACTED_SIZE", "25")
-        self.config.set("DEFAULT", "MIN_OUTPUT_SIZE", "100")
+        self.config.set("DEFAULT", "MIN_EXTRACTED_SIZE", "10")  # More lenient
+        self.config.set("DEFAULT", "MIN_OUTPUT_SIZE", "50")     # More lenient
         self.config.set("DEFAULT", "INCLUDE_IMAGES", "False")
         self.config.set("DEFAULT", "DEDUPLICATE", "True")
+        self.config.set("DEFAULT", "FAVOR_PRECISION", "False")  # More content extraction
+        self.config.set("DEFAULT", "FAVOR_RECALL", "True")      # Better coverage
 
-         # Compile regex patterns
+        # Compile regex patterns once for reuse (optimized)
         self.api_pattern = re.compile(r'\b[A-Z][A-Za-z0-9_]*\.[A-Za-z0-9_]+\b')
         self.function_pattern = re.compile(r'\b[a-z_][a-z0-9_]*\(.*?\)\b')
-        self.code_annotation_pattern = re.compile(r'#\s*<code>(.*?)<\/code>', re.DOTALL)
+        
+        # Combined technical annotation pattern (more efficient)
+        tech_keywords = '|'.join(re.escape(kw) for kw in self.TECHNICAL_KEYPHRASES)
+        self.tech_pattern = re.compile(rf'\b(?:{tech_keywords})\b', re.IGNORECASE)
+        
+        # Cache for parsed trees
+        self._tree_cache = {}
 
     
-    def extract_content(self, html_content: str, url: str, raw_doc: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Main content extraction method - only extracts main content and code blocks.
-        
-        Args:
-            html_content: Raw HTML content
-            url: Document URL
-            raw_doc: Raw document metadata (unused but kept for compatibility)
-            
-        Returns:
-            Dict with only 'main_content' and 'code_blocks' keys
-        """
-        # Initialize result with just the fields we care about
+    def extract_content(self, html_content: str, url: str, raw_doc: Dict[str, Any] = None, soup=None) -> Dict[str, Any]:
+        """Streamlined content extraction method - optimized for performance."""
         result = {
-            'main_content': '',
-            'code_blocks': []
+            'main_content': ''
+            
         }
-        
+
         try:
-            # Parse HTML only once
-            lxml_tree = self.parse_html(html_content)
+            # Use cached parsed tree if available
+            if soup is not None:
+                # Convert soup to lxml tree once and cache
+                cache_key = hash(str(soup)[:1000])  # Use hash of first 1KB as cache key
+                if cache_key not in self._tree_cache:
+                    lxml_tree = lxml_html.fromstring(str(soup))
+                    self._clean_tree_elements(lxml_tree)  # Use lxml-based cleaning
+                    self._tree_cache[cache_key] = lxml_tree
+                lxml_tree = self._tree_cache[cache_key]
+            else:
+                lxml_tree = self.parse_html(html_content)
+
             if lxml_tree is None:
-                # If parsing fails, try trafilatura fallback
-                logger.warning(f"HTML parsing failed for {url}, trying trafilatura fallback")
+                # Single fallback attempt with trafilatura
                 main_content = extract(html_content, config=self.config)
                 if main_content:
-                    result['main_content'] = main_content
+                    result['main_content'] = self.annotate_technical_references(main_content)
                 return result
+
+            # Single-pass extraction (no multiple fallbacks)
+            main_content = self.extract_main_content(lxml_tree)
             
-            # Extract with technical enhancements
-            extraction_result = self.extract_with_enhancements(lxml_tree, url)
-            result['main_content'] = extraction_result.get('main_content', '')
-            result['code_blocks'] = extraction_result.get('code_blocks', [])
+            # Only try technical extraction if main content is very short
+            if not main_content or len(main_content) < 200:
+                main_content = self.extract_technical_content(lxml_tree, url)
             
+            # Annotate technical references once
+            if main_content:
+                result['main_content'] = self.annotate_technical_references(main_content)
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Content extraction failed for {url}: {e}")
             return result
+
         
     def parse_html(self, html_content: str) -> Optional[Any]:
-        """Parse HTML content into lxml tree with aggressive script/style removal."""
+        """Parse HTML content into lxml tree with efficient element-based cleaning."""
         try:
-            # FIXED: Pre-clean HTML to remove scripts and styles before parsing
-            cleaned_html = self._remove_scripts_and_styles(html_content)
-            return lxml_html.fromstring(cleaned_html)
+            # Parse HTML first
+            tree = lxml_html.fromstring(html_content)
+            # Clean using lxml operations (much faster than regex)
+            self._clean_tree_elements(tree)
+            return tree
         except Exception as e:
             logger.warning(f"LXML parsing failed: {e}")
             return None
     
-    def _remove_scripts_and_styles(self, html_content: str) -> str:
-        """Aggressively remove script and style content from HTML."""
-        import re
-        
-        # Remove all script tags and their content
-        html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-        
-        # Remove all style tags and their content  
-        html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-        
-        # Remove inline JavaScript event handlers
-        html_content = re.sub(r'\s*on\w+\s*=\s*["\'][^"\']*["\']', '', html_content, flags=re.IGNORECASE)
-        
-        # Remove javascript: protocol links
-        html_content = re.sub(r'href\s*=\s*["\']javascript:[^"\']*["\']', '', html_content, flags=re.IGNORECASE)
-        
-        # Remove noscript tags (they often contain fallback content we don't want)
-        html_content = re.sub(r'<noscript[^>]*>.*?</noscript>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-        
-        return html_content
+    def _clean_tree_elements(self, tree) -> None:
+        """Efficiently remove unwanted elements using lxml operations."""
+        # Remove scripts, styles, and other unwanted elements in one pass
+        unwanted_tags = ['script', 'style', 'noscript', 'iframe', 'embed', 'object']
+        for tag in unwanted_tags:
+            for element in tree.xpath(f'.//{tag}'):
+                if element.getparent() is not None:
+                    element.getparent().remove(element)
     
-    def extract_with_enhancements(self, lxml_tree: Any, url: str) -> Dict[str, Any]:
-        """Multi-stage extraction focusing on content and technical elements."""
-        result = {'main_content': '', 'code_blocks': []}
-        
-        # Pass 1: Extract with trafilatura (best for standard content)
-        main_content = self.extract_main_content(lxml_tree)
-        
-        # Pass 2: Extract and preserve code blocks
-        code_blocks = self.extract_code_blocks(lxml_tree)
-        result['code_blocks'] = code_blocks
-        
-        # Pass 3: Enhanced extraction for technical content
-        if not main_content or len(main_content) < 500:
-            main_content = self.extract_technical_content(lxml_tree, url)
-        
-        # Pass 5: Fallback if all else fails
-        if not main_content or len(main_content) < 300:
-            main_content = self._extract_text_fallback(lxml_tree)
-            
-        # Annotate API references and function calls
-        main_content = self.annotate_technical_references(main_content)
-        
-        # Reinsert code blocks as annotated blocks
-        for i, block in enumerate(code_blocks):
-            placeholder = f"\n# <code>CODE_BLOCK_{i}</code>\n"
-            main_content = main_content.replace(block['text'], placeholder, 1)
-        
-        result['main_content'] = main_content
-        return result
+    # Multi-stage extraction removed - replaced with streamlined single-pass extraction
     
     def extract_main_content(self, lxml_tree: Any) -> Optional[str]:
         """Extract main content using trafilatura with enhanced settings."""
         try:
             # Convert lxml tree back to string for trafilatura
             html_str = lxml_html.tostring(lxml_tree, encoding='unicode')
-            content = extract(
-                html_str,
-                include_comments=False,
-                include_tables=True,  # Include tables for technical content
-                include_links=False,
-                no_fallback=False,  # Allow fallback for better coverage
-                config=self.config
-            )
-            return content
+            
+            # Temporarily suppress trafilatura warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                content = extract(
+                    html_str,
+                    include_comments=False,
+                    include_tables=True,  # Include tables for technical content
+                    include_links=False,
+                    no_fallback=False,  # Allow fallback for better coverage
+                    config=self.config
+                )
+            
+            # Return content or None silently if extraction failed
+            return content if content and len(content.strip()) > 0 else None
+            
         except Exception as e:
             logger.error(f"Content extraction failed: {e}")
             return None
 
     def extract_technical_content(self, lxml_tree: Any, url: str) -> str:
-        """Specialized extraction for technical documentation."""
+        """Simplified technical content extraction with batched XPath queries."""
         content_parts = []
         
-        # Extract by semantic sections
-        sections = [
-            ('//*[@id="overview"]',           "Overview"),
-            ('//*[@id="introduction"]',       "Introduction"),
-            ('//*[@id="installation"]',       "Installation"),
-            ('//*[@id="requirements"]',       "Requirements"),
-            ('//*[@id="setup"]',              "Setup"),
-            ('//*[@id="getting-started"]',    "Getting Started"),
-            ('//*[@id="usage"]',              "Usage"),
-            ('//*[@id="configuration"]',      "Configuration"),
-            ('//*[@id="options"]',            "Options"),
-            ('//*[@id="parameters"]',         "Parameters"),
-            ('//*[@id="properties"]',         "Properties"),
-            ('//*[@id="methods"]',            "Methods"),
-            ('//*[@id="functions"]',          "Functions"),
-            ('//*[@id="endpoints"]',          "Endpoints"),
-            ('//*[@id="examples"]',           "Examples"),
-            ('//*[@id="code-examples"]',      "Code Examples"),
-            ('//*[@id="responses"]',          "Responses"),
-            ('//*[@id="return-values"]',      "Return Values"),
-            ('//*[@id="errors"]',             "Errors"),
-            ('//*[@id="exceptions"]',         "Exceptions"),
-            ('//*[@id="events"]',             "Events"),
-            ('//*[@id="notes"]',              "Notes"),
-            ('//*[@id="faq"]',                "FAQ"),
-            ('//*[@id="troubleshooting"]',    "Troubleshooting"),
-            ('//*[@id="performance"]',        "Performance"),
-            ('//*[@id="security"]',           "Security"),
-            ('//*[@id="schema"]',             "Schema"),
-            ('//*[@id="diagram"]',            "Diagram"),
-            ('//article',                     "Article"),
-            ('//main',                        "Main Content"),
-            ('//section[contains(@class,"doc")]', "Doc Section"),
-            ('//div[contains(@class,"content")]', "Content Block"),
+        # Batch XPath queries for better performance
+        all_selectors = [
+            '//article', '//main', '//section[contains(@class,"doc")]', 
+            '//div[contains(@class,"content")]', '//*[@id="overview"]',
+            '//*[@id="introduction"]', '//*[@id="usage"]', '//*[@id="examples"]'
         ]
-
         
-        for xpath, section_name in sections:
-            elements = lxml_tree.xpath(xpath)
-            if elements:
-                try:
-                    section_text = elements[0].text_content().strip()
-                    if section_text and len(section_text) > 100:
-                        content_parts.append(f"\n\n### {section_name} ###\n\n")
-                        content_parts.append(section_text)
-                except Exception:
-                    continue
+        # Single XPath query for all selectors
+        xpath_query = ' | '.join(all_selectors)
+        elements = lxml_tree.xpath(xpath_query)
         
-        return "\n".join(content_parts) if content_parts else ""
-
-    def extract_code_blocks(self, lxml_tree: Any) -> List[Dict[str, str]]:
-        """Extract and preserve code blocks with language detection."""
-        code_blocks = []
-        
-        # XPath to find code containers
-        code_containers = lxml_tree.xpath('//pre|//code|//div[contains(@class, "code")]')
-        
-        for container in code_containers:
+        for element in elements[:5]:  # Limit to first 5 matches for performance
             try:
-                # Get language from class attributes
-                class_list = container.get('class', '').split()
-                language = 'unknown'
-                for cls in class_list:
-                    if cls.startswith('language-'):
-                        language = cls[9:]
-                    elif cls in [
-                            'python', 'js', 'javascript', 'java', 'c++', 'html', 'css',
-                            'c', 'c#', 'php', 'ruby', 'go', 'rust', 'typescript', 'swift',
-                            'kotlin', 'r', 'scala', 'perl', 'dart', 'matlab', 'sql', 'bash',
-                            'objective-c', 'lua', 'groovy', 'haskell', 'elixir', 'erlang'
-                        ]:
-                        language = cls
-
-                
-                # Extract clean code text
-                code_text = container.text_content().strip()
-                if code_text and len(code_text) > 10:
-                    code_blocks.append({
-                        'text': code_text,
-                        'language': language,
-                        'element': container.tag
-                    })
-            except Exception as e:
-                logger.debug(f"Code extraction failed: {e}")
+                section_text = element.text_content().strip()
+                if section_text and len(section_text) > 100:
+                    content_parts.append(section_text)
+                    if len(' '.join(content_parts)) > 2000:  # Stop when we have enough content
+                        break
+            except Exception:
                 continue
         
-        return code_blocks
+        return "\n\n".join(content_parts[:3]) if content_parts else ""  # Limit output size
+
+    # Code block extraction removed per user request for performance optimization
     
     
-    def _extract_text_fallback(self, lxml_tree: Any) -> str:
-        """Fallback text extraction when trafilatura fails."""
-        try:
-            # Remove script and style elements
-            for element in lxml_tree.xpath('.//script | .//style | .//nav | .//header | .//footer'):
-                if element.getparent() is not None:
-                    element.getparent().remove(element)
-            
-            # Get text from main content areas
-            main_selectors = [
-                './/main', './/article', './/div[contains(@class, "content")]',
-                './/div[contains(@id, "content")]', './/div[contains(@class, "post")]'
-            ]
-            
-            for selector in main_selectors:
-                elements = lxml_tree.xpath(selector)
-                if elements:
-                    text = elements[0].text_content()
-                    if text and len(text.strip()) > 100:
-                        return text.strip()
-            
-            # Final fallback: get all text
-            return lxml_tree.text_content().strip()
-            
-        except Exception as e:
-            logger.warning(f"Fallback text extraction failed: {e}")
-            return ""
+    # Fallback text extraction removed - using single-pass extraction approach for performance
     
     def annotate_technical_references(self, content: str) -> str:
-        """Annotate API references and function calls in content."""
+        """Optimized technical reference annotation using combined patterns."""
+        if not content or len(content) > 50000:  # Skip very large content for performance
+            return content
+        
+        # Single-pass annotation with combined patterns (more efficient)
         # Annotate API references
         content = self.api_pattern.sub(r'# <api>\g<0></api>', content)
         
-        # Annotate function calls
+        # Annotate function calls  
         content = self.function_pattern.sub(r'# <fn>\g<0></fn>', content)
         
-        # Annotate technical keywords
-        for phrase in self.TECHNICAL_KEYPHRASES:
-            pattern = re.compile(r'\b' + re.escape(phrase) + r'\b', re.IGNORECASE)
-            content = pattern.sub(r'# <tech>\g<0></tech>', content)
+        # Annotate technical keywords in one pass
+        content = self.tech_pattern.sub(r'# <tech>\g<0></tech>', content)
         
         return content
     

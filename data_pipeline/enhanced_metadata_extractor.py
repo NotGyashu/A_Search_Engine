@@ -1,5 +1,5 @@
 """
-Enhanced Metadata Extractor - Advanced HTML Data Extraction
+Enhanced Metadata Extractor - Optimized HTML Data Extraction
 
 Extracts structured data, canonical URLs, publication dates, images, 
 table of contents, and author information from HTML content.
@@ -12,6 +12,13 @@ from typing import Dict, List, Any, Optional, Union
 from urllib.parse import urljoin, urlparse
 from datetime import datetime, timedelta
 import dateutil.parser
+# Fast date parsing patterns (compiled once)
+DATE_PATTERNS = [
+    re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'),  # ISO format
+    re.compile(r'\d{4}-\d{2}-\d{2}'),  # Simple date
+    re.compile(r'\d{2}/\d{2}/\d{4}'),  # MM/DD/YYYY
+    re.compile(r'\d{2}-\d{2}-\d{4}'),  # MM-DD-YYYY
+]
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +72,9 @@ class StructuredDataExtractor:
                 item_type = item.get('itemtype', '')
                 if item_type:
                     item_data['@type'] = item_type.split('/')[-1]  # Get last part of URL
-                
-                # Extract properties
-                properties = item.find_all(attrs={'itemprop': True})
+
+                # Extract properties, limit to 100 per item
+                properties = item.find_all(attrs={'itemprop': True}, limit=100)
                 for prop in properties:
                     prop_name = prop.get('itemprop')
                     prop_value = self._extract_microdata_value(prop)
@@ -76,6 +83,10 @@ class StructuredDataExtractor:
                 
                 if item_data:
                     microdata.append(item_data)
+                    
+                if len(microdata) >= 50:  # Limit total items
+                    break
+                    
         except Exception as e:
             logger.debug(f"Microdata extraction failed: {e}")
         
@@ -138,47 +149,35 @@ class EnhancedMetadataExtractor:
             'updated'
         ]
     
-    def extract_enhanced_metadata(self, html_content: str, base_url: str = None) -> Dict[str, Any]:
+    def extract_enhanced_metadata(
+        self, 
+        html_content: str, 
+        base_url: str = None, 
+        soup: "BeautifulSoup" = None
+    ) -> Dict[str, Any]:
         """Extract comprehensive metadata from HTML content."""
-        try:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html_content, 'lxml')
-        except ImportError:
-            logger.error("BeautifulSoup not available for enhanced metadata extraction")
-            return {}
+
+        # Only parse if soup wasn't provided
+        if soup is None:
+            raise ValueError("BeautifulSoup object (soup) must be provided or html_content must be non-empty.")
         
         metadata = {}
-        
-        # Store base URL for icon resolution
         self._base_url = base_url
-        
-        # FIXED: Extract basic page metadata first
+
+        # Reuse soup everywhere
         metadata['page_metadata'] = self._extract_basic_page_metadata(soup)
-        
-        # Extract structured data (needed for enhanced extraction)
         structured_data = self._extract_all_structured_data(soup)
         metadata['structured_data'] = structured_data
-        
-        # Extract canonical URL
         metadata['canonical_url'] = self._extract_canonical_url(soup, base_url)
-        
-        # ENHANCED: Extract publication and modification dates from multiple sources
         date_info = self._extract_publication_dates(soup, structured_data)
         metadata.update(date_info)
-        
-        # Extract image information
         metadata['images'] = self._extract_image_data(soup, base_url)
-        
-        # ENHANCED: Extract comprehensive table of contents
         metadata['table_of_contents'] = self._extract_table_of_contents(soup, base_url)
-        
-        # ENHANCED: Extract comprehensive author information
         metadata['author_info'] = self._extract_author_info(soup, structured_data)
-        
-        # Extract additional semantic information
         metadata['semantic_info'] = self._extract_semantic_info(soup)
-        
+
         return metadata
+
     
     def _extract_all_structured_data(self, soup) -> Dict[str, List[Dict[str, Any]]]:
         """Extract all types of structured data."""
