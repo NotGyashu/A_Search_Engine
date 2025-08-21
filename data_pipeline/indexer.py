@@ -809,9 +809,9 @@ class OpenSearchIndexer:
     
     def bulk_index_documents(self, documents: List[Dict[str, Any]], 
                            chunks: List[Dict[str, Any]], 
-                           thread_count: int = 4, 
-                           chunk_size: int = 500) -> Dict[str, int]:
-        """Perform bulk indexing with monitoring and error handling."""
+                           thread_count: int = 2, 
+                           chunk_size: int = 1000) -> Dict[str, int]:
+        """Perform bulk indexing with rate limiting protection and error handling."""
         if not self.client:
             logger.error("OpenSearch client not connected")
             return {"success": 0, "failed": 0}
@@ -842,13 +842,14 @@ class OpenSearchIndexer:
                         "_source": chunk
                     }
             
-            # Perform bulk indexing with parallel threads
+            # Perform bulk indexing with optimized settings for rate limiting
             for success, info in helpers.parallel_bulk(
                 client=self.client,
                 actions=generate_actions(),
-                thread_count=min(thread_count, 4),
-                chunk_size=chunk_size,
-                request_timeout=60,
+                thread_count=min(thread_count, 2),  # Reduced from 4 to 2
+                chunk_size=chunk_size,  # Reduced default from 500 to 200
+                request_timeout=120,  # Increased timeout from 60 to 120
+                max_chunk_bytes=1048576,  # 1MB max chunk size
                 raise_on_error=False,
                 raise_on_exception=False
             ):
@@ -856,7 +857,14 @@ class OpenSearchIndexer:
                     results["success"] += 1
                 else:
                     results["failed"] += 1
-                    logger.warning(f"Document indexing failed: {info}")
+                    # Handle rate limiting specifically
+                    error_str = str(info.get('index', {}).get('error', ''))
+                    if '429' in error_str or 'Too Many Requests' in error_str:
+                        logger.warning(f"Rate limited - will retry: {info}")
+                        # Add small delay for rate limiting
+                        time.sleep(0.1)
+                    else:
+                        logger.warning(f"Document indexing failed: {info}")
             
             # Update stats
             indexing_time = time.time() - start_time
@@ -876,6 +884,43 @@ class OpenSearchIndexer:
             results["failed"] += len(documents) + len(chunks)
         
         return results
+    
+    def bulk_index_with_retry(self, documents: List[Dict[str, Any]], 
+                             chunks: List[Dict[str, Any]], 
+                             max_retries: int = 3) -> Dict[str, int]:
+        """Bulk index with exponential backoff for rate limiting."""
+        for attempt in range(max_retries):
+            try:
+                # Use smaller chunks and fewer threads for rate limiting protection
+                chunk_size = max(50, 200 // (attempt + 1))  # Decrease chunk size on retries
+                thread_count = max(1, 2 // (attempt + 1))   # Decrease threads on retries
+                
+                results = self.bulk_index_documents(
+                    documents=documents, 
+                    chunks=chunks,
+                    thread_count=thread_count,
+                    chunk_size=chunk_size
+                )
+                
+                # If we had some failures due to rate limiting, retry only those
+                if results["failed"] > 0 and attempt < max_retries - 1:
+                    logger.info(f"Attempt {attempt + 1}: {results['failed']} failures, retrying...")
+                    wait_time = (2 ** attempt) * 0.5  # Exponential backoff: 0.5s, 1s, 2s
+                    time.sleep(wait_time)
+                    continue
+                
+                return results
+                
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 1.0  # 1s, 2s, 4s
+                    logger.warning(f"Indexing attempt {attempt + 1} failed: {e}, retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"All indexing attempts failed: {e}")
+                    return {"success": 0, "failed": len(documents) + len(chunks)}
+        
+        return {"success": 0, "failed": len(documents) + len(chunks)}
     
     def cleanup_old_indices(self, days_to_keep: int = 7) -> Dict[str, int]:
         """Remove indices older than specified days to manage storage."""

@@ -63,15 +63,15 @@ class DocumentChunk:
 
 
 class DocumentProcessor:
-    """Advanced document processing with modular components."""
+    """Advanced document processing with modular components and optimized extraction."""
     
     def __init__(self, min_content_length: int = 400, max_chunk_size: int = 2000):
-        self.min_content_length = min_content_length  # Reduced from 600 to 400 for better coverage
+        self.min_content_length = min_content_length
         self.max_chunk_size = max_chunk_size
         
         # Initialize processing modules with improved settings
         self.extractor = ContentExtractor()
-        self.cleaner = ContentCleaner(max_chunk_size=max_chunk_size, min_chunk_size=400)  # Increased from 300 to 400
+        self.cleaner = ContentCleaner(max_chunk_size=max_chunk_size, min_chunk_size=400)
         self.scorer = ContentScorer()
         self.enhanced_extractor = EnhancedMetadataExtractor()
         
@@ -83,8 +83,346 @@ class DocumentProcessor:
             'skipped_count': 0,
             'total_processing_time': 0,
             'content_too_short': 0,
-            'language_filtered': 0
+            'language_filtered': 0,
+            'extraction_failed': 0
         }
+    
+    def _extract_all_from_soup(self, soup: BeautifulSoup, base_url: str) -> Dict[str, Any]:
+        """
+        ULTRA-OPTIMIZED: Single-pass HTML extraction
+        Extract ALL data in one traversal, then process without soup
+        """
+        if not soup:
+            return {}
+
+        try:
+            # SINGLE-PASS RAW EXTRACTION
+            raw_data = self._single_pass_raw_extraction(soup, base_url)
+            
+            # PROCESS RAW DATA (NO MORE SOUP OPERATIONS)
+            processed_data = self._process_raw_data(raw_data, base_url)
+            
+            return processed_data
+            
+        except Exception as e:
+            logger.warning(f"Error in ultra-optimized extraction for {base_url}: {e}")
+            return {}
+    
+    def _single_pass_raw_extraction(self, soup: BeautifulSoup, base_url: str) -> Dict[str, Any]:
+        """Extract all raw data in a single HTML traversal."""
+        raw_data = {
+            'meta_tags': {},
+            'script_tags': [],
+            'links': [],
+            'headings': [],
+            'images': [],
+            'tables': [],
+            'text_content': '',
+            'title': '',
+            'lang': '',
+            'author_elements': [],
+            'date_elements': [],
+            'structured_data': {'json_ld': [], 'microdata': [], 'rdfa': []}
+        }
+        
+        # Extract title and language at document level
+        if soup.title:
+            raw_data['title'] = soup.title.get_text(strip=True)
+        
+        html_tag = soup.find('html')
+        if html_tag:
+            raw_data['lang'] = html_tag.get('lang', '')
+        
+        # Single traversal to extract ALL data
+        for element in soup.find_all():
+            tag_name = element.name.lower()
+            
+            # Meta tags
+            if tag_name == 'meta':
+                attrs = element.attrs
+                content = attrs.get('content', '')
+                if content:
+                    # Store all meta attributes for later processing
+                    key = None
+                    if 'name' in attrs:
+                        key = f"name:{attrs['name']}"
+                    elif 'property' in attrs:
+                        key = f"property:{attrs['property']}"
+                    elif 'http-equiv' in attrs:
+                        key = f"http-equiv:{attrs['http-equiv']}"
+                    
+                    if key:
+                        raw_data['meta_tags'][key] = content
+            
+            # JSON-LD and scripts
+            elif tag_name == 'script':
+                script_type = element.get('type', '').lower()
+                if 'json' in script_type or 'ld' in script_type:
+                    try:
+                        script_content = element.get_text(strip=True)
+                        if script_content:
+                            import json
+                            parsed = json.loads(script_content)
+                            raw_data['structured_data']['json_ld'].append(parsed)
+                    except:
+                        pass
+            
+            # Links (canonical, etc.)
+            elif tag_name == 'link':
+                rel = element.get('rel', [])
+                if isinstance(rel, str):
+                    rel = [rel]
+                href = element.get('href', '')
+                if href:
+                    raw_data['links'].append({
+                        'rel': rel,
+                        'href': href,
+                        'type': element.get('type', ''),
+                        'title': element.get('title', '')
+                    })
+            
+            # Headings for TOC
+            elif tag_name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                raw_data['headings'].append({
+                    'level': int(tag_name[1]),
+                    'text': element.get_text(strip=True),
+                    'id': element.get('id', '')
+                })
+            
+            # Images
+            elif tag_name == 'img':
+                src = element.get('src', '')
+                if src:
+                    raw_data['images'].append({
+                        'src': src,
+                        'alt': element.get('alt', ''),
+                        'title': element.get('title', ''),
+                        'width': element.get('width', ''),
+                        'height': element.get('height', '')
+                    })
+            
+            # Author-related elements
+            elif any(cls in element.get('class', []) for cls in ['author', 'byline', 'writer']) or \
+                 element.get('rel') == 'author' or \
+                 element.get('itemprop') in ['author', 'creator']:
+                raw_data['author_elements'].append({
+                    'tag': tag_name,
+                    'text': element.get_text(strip=True),
+                    'class': element.get('class', []),
+                    'itemprop': element.get('itemprop', ''),
+                    'href': element.get('href', '')
+                })
+            
+            # Date-related elements
+            elif 'time' in tag_name or \
+                 any(cls in element.get('class', []) for cls in ['date', 'published', 'updated']) or \
+                 element.get('itemprop') in ['datePublished', 'dateModified', 'dateCreated']:
+                raw_data['date_elements'].append({
+                    'tag': tag_name,
+                    'text': element.get_text(strip=True),
+                    'datetime': element.get('datetime', ''),
+                    'class': element.get('class', []),
+                    'itemprop': element.get('itemprop', '')
+                })
+        
+        # Extract clean text content
+        raw_data['text_content'] = soup.get_text(separator=' ', strip=True)
+        
+        return raw_data
+    
+    def _process_raw_data(self, raw_data: Dict[str, Any], base_url: str) -> Dict[str, Any]:
+        """Process raw extracted data without any soup operations."""
+        processed = {
+            'page_metadata': self._process_page_metadata(raw_data),
+            'structured_data': raw_data['structured_data'],
+            'canonical_url': self._process_canonical_url(raw_data, base_url),
+            'images': self._process_image_data(raw_data, base_url),
+            'table_of_contents': self._process_table_of_contents(raw_data),
+            'author_info': self._process_author_info(raw_data),
+            'semantic_info': self._process_semantic_info(raw_data),
+        }
+        
+        # Process dates
+        date_info = self._process_publication_dates(raw_data)
+        processed['published_date'] = date_info.get('published_date')
+        processed['modified_date'] = date_info.get('modified_date')
+        
+        return processed
+    
+    def _process_page_metadata(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process basic page metadata from raw data."""
+        meta_tags = raw_data['meta_tags']
+        
+        # Description priority order
+        description = (
+            meta_tags.get('property:og:description') or
+            meta_tags.get('name:description') or
+            meta_tags.get('name:twitter:description') or
+            ''
+        )
+        
+        # Keywords
+        keywords = meta_tags.get('name:keywords', '')
+        
+        # Other metadata
+        return {
+            'title': raw_data['title'],
+            'description': description,
+            'keywords': keywords.split(',') if keywords else [],
+            'language': raw_data['lang'],
+            'og_title': meta_tags.get('property:og:title', ''),
+            'og_type': meta_tags.get('property:og:type', ''),
+            'twitter_card': meta_tags.get('name:twitter:card', ''),
+            'robots': meta_tags.get('name:robots', ''),
+            'viewport': meta_tags.get('name:viewport', '')
+        }
+    
+    def _process_publication_dates(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process publication dates from raw meta data."""
+        meta_tags = raw_data['meta_tags']
+        dates = {}
+        
+        # Publication date patterns (highest priority first)
+        pub_patterns = [
+            'property:article:published_time',
+            'name:article:published_time', 
+            'name:publication_date',
+            'name:date',
+            'name:pubdate',
+            'name:DC.Date'
+        ]
+        
+        for pattern in pub_patterns:
+            if pattern in meta_tags and not dates.get('published_date'):
+                date_str = meta_tags[pattern]
+                parsed_date = self._parse_date_string(date_str)
+                if parsed_date:
+                    dates['published_date'] = parsed_date
+                    break
+        
+        # Modified date patterns
+        mod_patterns = [
+            'property:article:modified_time',
+            'name:article:modified_time',
+            'name:last-modified',
+            'name:DC.Date.Modified'
+        ]
+        
+        for pattern in mod_patterns:
+            if pattern in meta_tags and not dates.get('modified_date'):
+                date_str = meta_tags[pattern]
+                parsed_date = self._parse_date_string(date_str)
+                if parsed_date:
+                    dates['modified_date'] = parsed_date
+                    break
+        
+        # Also check structured data
+        for json_ld in raw_data['structured_data']['json_ld']:
+            if not dates.get('published_date'):
+                for field in ['datePublished', 'publishedDate', 'dateCreated']:
+                    if field in json_ld:
+                        parsed_date = self._parse_date_string(json_ld[field])
+                        if parsed_date:
+                            dates['published_date'] = parsed_date
+                            break
+            
+            if not dates.get('modified_date'):
+                for field in ['dateModified', 'modifiedDate', 'dateUpdated']:
+                    if field in json_ld:
+                        parsed_date = self._parse_date_string(json_ld[field])
+                        if parsed_date:
+                            dates['modified_date'] = parsed_date
+                            break
+        
+        return dates
+    
+    def _process_canonical_url(self, raw_data: Dict[str, Any], base_url: str) -> str:
+        """Extract canonical URL from raw link data."""
+        for link in raw_data['links']:
+            if 'canonical' in link['rel']:
+                href = link['href']
+                if href.startswith('http'):
+                    return href
+                else:
+                    from urllib.parse import urljoin
+                    return urljoin(base_url, href)
+        return base_url
+    
+    def _process_image_data(self, raw_data: Dict[str, Any], base_url: str) -> List[Dict[str, Any]]:
+        """Process image data from raw extraction."""
+        images = []
+        from urllib.parse import urljoin
+        
+        for img in raw_data['images'][:10]:  # Limit to first 10 images
+            src = img['src']
+            if not src.startswith('http'):
+                src = urljoin(base_url, src)
+            
+            images.append({
+                'src': src,
+                'alt': img['alt'],
+                'title': img['title']
+            })
+        
+        return images
+    
+    def _process_table_of_contents(self, raw_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate table of contents from headings."""
+        toc = []
+        for heading in raw_data['headings']:
+            if heading['text']:  # Only include headings with text
+                toc.append({
+                    'level': heading['level'],
+                    'text': heading['text'],
+                    'anchor': heading['id'] or heading['text'].lower().replace(' ', '-')
+                })
+        return toc
+    
+    def _process_author_info(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process author information from raw data."""
+        author_info = {'name': '', 'url': '', 'bio': ''}
+        
+        # Check meta tags first
+        meta_tags = raw_data['meta_tags']
+        author_name = (
+            meta_tags.get('name:author') or
+            meta_tags.get('property:article:author') or
+            meta_tags.get('name:twitter:creator') or
+            ''
+        )
+        
+        if author_name:
+            author_info['name'] = author_name
+        
+        # Check author elements
+        for elem in raw_data['author_elements']:
+            if elem['text'] and not author_info['name']:
+                author_info['name'] = elem['text']
+            if elem['href'] and not author_info['url']:
+                author_info['url'] = elem['href']
+        
+        return author_info
+    
+    def _process_semantic_info(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process semantic information from raw data."""
+        return {
+            'headings_count': len(raw_data['headings']),
+            'images_count': len(raw_data['images']),
+            'has_structured_data': len(raw_data['structured_data']['json_ld']) > 0,
+            'word_count': len(raw_data['text_content'].split()) if raw_data['text_content'] else 0
+        }
+    
+    def _parse_date_string(self, date_str: str) -> str:
+        """Parse date string and return ISO format."""
+        if not date_str:
+            return ''
+        
+        try:
+            from dateutil.parser import parse
+            parsed = parse(date_str)
+            return parsed.isoformat()
+        except:
+            return date_str  # Return original if parsing fails
     
     def _score_description_quality(self, description: str, source_type: str) -> float:
         """Score description quality based on content and source."""
@@ -127,47 +465,36 @@ class DocumentProcessor:
         
         return max(0.0, score)
     
-    def _determine_content_type(self, url: str, enhanced_metadata: Dict) -> str:
+    def _determine_content_type(self, url: str, metadata: Dict) -> str:
         """Determine the content type based on URL and metadata."""
         content_type = "article"  # default
         
-        if enhanced_metadata:
-            # Check for blog indicators
-            if (any(indicator in url.lower() for indicator in ['blog', 'news', 'post']) or
-                any(indicator in enhanced_metadata.get('description', '').lower() for indicator in ['blog', 'post', 'article'])):
-                content_type = "blog"
-            
-            # Check for technical content
-            elif any(keyword in enhanced_metadata.get('description', '').lower() for keyword in 
-                    ['tutorial', 'guide', 'documentation', 'api', 'code', 'programming']):
-                content_type = "documentation"
+        # Use pre-extracted metadata instead of searching again
+        page_metadata = metadata.get('page_metadata', {})
+        description = page_metadata.get('description', '').lower()
+        
+        # Check for blog indicators
+        if (any(indicator in url.lower() for indicator in ['blog', 'news', 'post']) or
+            any(indicator in description for indicator in ['blog', 'post', 'article'])):
+            content_type = "blog"
+        
+        # Check for technical content
+        elif any(keyword in description for keyword in 
+                ['tutorial', 'guide', 'documentation', 'api', 'code', 'programming']):
+            content_type = "documentation"
         
         return content_type
-        
-        # Processing statistics
-        self.stats = {
-            'processed_count': 0,
-            'successful_count': 0,
-            'failed_count': 0,
-            'skipped_count': 0,
-            'total_processing_time': 0,
-            'language_filtered': 0,
-            'content_too_short': 0,
-            'extraction_failed': 0
-        }
     
     def process_document(self, raw_doc: Dict[str, Any]) -> Optional[Dict[str, List[Dict[str, Any]]]]:
         """
         Process a single raw document through the complete pipeline.
-        
-        Returns:
-            Dict with 'documents' and 'chunks' lists, or None if processing failed
+        REFACTORED for performance - Extract-Once, Transform-Later strategy.
         """
         start_time = time.time()
         self.stats['processed_count'] += 1
         
         try:
-            # Step 1: Basic validation
+            # Step 1: Basic validation (fast early exits)
             url = str(raw_doc.get("url", "")).strip()
             if not url:
                 logger.debug("Skipping document: No URL")
@@ -175,80 +502,54 @@ class DocumentProcessor:
                 return None
             
             html_content = raw_doc.get("content", "")
-            if not html_content:
-                logger.debug(f"Skipping {url}: No HTML content")
-                self.stats['skipped_count'] += 1
-                return None
-            
-            # Step 2: Early content size filtering (before expensive operations)
-            if len(html_content) < 500:  # Quick pre-filter
+            if not html_content or len(html_content) < 500:
                 logger.debug(f"Skipping {url}: HTML too short ({len(html_content)} chars)")
                 self.stats['content_too_short'] += 1
                 return None
                 
-            # Step 2.5: Language filtering (optimized)
+            # Step 2: Language filtering (optimized early exit)
             if not LanguageDetector.is_english(html_content, url):
                 self.stats['language_filtered'] += 1
-                return None            # Step 3: Single-pass HTML parsing and extraction (optimized)
-            # Parse HTML once and reuse for both content and metadata extraction
+                return None
+            
+            # Step 3: Single-pass HTML parsing
             soup = None
             try:
                 soup = BeautifulSoup(html_content, "lxml")
             except Exception as e:
                 logger.warning(f"Failed to parse HTML for {url}: {e}")
-                
-            extracted_data = self.extractor.extract_content(html_content, url, raw_doc, soup=soup if soup else None)
-            enhanced_metadata = self.enhanced_extractor.extract_enhanced_metadata(html_content, url, soup=soup if soup else None)
-
-            # Check if extraction failed completely
-            if not extracted_data or not extracted_data.get('main_content'):
-                logger.debug(f"Skipping {url}: Content extraction failed")
-                self.stats['skipped_count'] += 1
+                self.stats['failed_count'] += 1
                 return None
+
+            # Step 4: ONE-TIME Coordinated Extraction
+            # This is the core optimization. All data is pulled from `soup` here.
+            all_extracted_data = self._extract_all_from_soup(soup, url)
             
-            main_content = extracted_data.get('main_content', '')
-            code_blocks = extracted_data.get('code_blocks', [])
+            # Use extractor for main content but pass soup to avoid re-parsing
+            main_content_data = self.extractor.extract_content(
+                html_content, url, raw_doc, soup=soup
+            )
             
+            main_content = main_content_data.get('main_content', '')
             if not main_content or len(main_content) < self.min_content_length:
-                logger.debug(f"Skipping {url}: Content too short ({len(main_content) if main_content else 0} chars)")
+                logger.debug(f"Skipping {url}: Content too short ({len(main_content)} chars)")
                 self.stats['content_too_short'] += 1
                 return None
+
+            # --- From this point on, we NO LONGER touch the `soup` object ---
+            # All subsequent operations work with extracted strings and dictionaries
+
+            # Step 5: Metadata Consolidation (working with extracted dictionaries)
+            page_meta = all_extracted_data.get('page_metadata', {})
+            structured_data = all_extracted_data.get('structured_data', {})
+            json_ld_data = structured_data.get('json_ld', [])
             
-            # Step 4: Optimized metadata consolidation (single pass)
-            metadata = enhanced_metadata.get('structured_data', {})
-            page_meta = enhanced_metadata.get('page_metadata', {})
-            
-            # Build consolidated metadata dict once
-            all_metadata = {
-                'og_title': metadata.get('open_graph', {}).get('title'),
-                'og_description': metadata.get('open_graph', {}).get('description'),
-                'meta_title': page_meta.get('title'),
-                'meta_description': page_meta.get('description'),
-                'json_ld': metadata.get('json_ld', []),
-                'microdata': metadata.get('microdata', [])
-            }
-            
-            # Extract JSON-LD data once
-            json_ld_title = json_ld_description = None
-            if all_metadata['json_ld']:
-                first_item = all_metadata['json_ld'][0]
-                json_ld_title = first_item.get('headline')
-                json_ld_description = first_item.get('description')
-            
-            # Extract microdata once
-            microdata_title = microdata_description = None
-            if all_metadata['microdata']:
-                first_item = all_metadata['microdata'][0]
-                microdata_title = first_item.get('headline')
-                microdata_description = first_item.get('description')
-            
-            # Title selection (optimized hierarchy)
+            # Title selection with simplified logic
             crawler_title = raw_doc.get('title', '') if raw_doc.get('title') not in ['N/A', 'n/a', 'None', 'null', ''] else ''
             title = (
-                all_metadata['og_title'] or 
-                json_ld_title or 
-                microdata_title or 
-                all_metadata['meta_title'] or 
+                page_meta.get('og_title') or 
+                (json_ld_data[0].get('headline') if json_ld_data else None) or
+                page_meta.get('title') or 
                 crawler_title or 
                 "Untitled Document"
             )
@@ -260,74 +561,54 @@ class DocumentProcessor:
                 title = "Untitled Document"
                 
             domain = raw_doc.get('domain', '') or self._extract_domain(url)
-            
-            headings = enhanced_metadata.get('toc_structure', [])
-            if not headings:
-                # Fallback to any headings we can find
-                headings = self._extract_headings_from_content(main_content)
-            
-            # Step 7: Content cleaning
+            headings = all_extracted_data.get('table_of_contents', [])
+
+            # Step 6: Content Cleaning (on extracted string only)
             cleaned_content = self.cleaner.clean_text(main_content)
             if not cleaned_content:
                 logger.debug(f"Skipping {url}: Content cleaning resulted in empty text")
                 self.stats['content_too_short'] += 1
                 return None
             
-            # Step 5: Optimized description selection
-            descriptions = [
-                (all_metadata['og_description'], 'og_description', 2.5),
-                (all_metadata['meta_description'], 'meta_description', 2.0),
-                (json_ld_description, 'json_ld_description', 1.5),
-                (microdata_description, 'microdata_description', 1.0)
-            ]
+            # Step 7: Description Selection (from pre-extracted metadata)
+            og_description = page_meta.get('og_description')
+            meta_description = page_meta.get('description')
+            json_ld_description = json_ld_data[0].get('description') if json_ld_data else None
             
-            best_description = None
-            best_score = 0
+            description = None
+            if og_description and len(og_description.strip()) > 10:
+                description = self.cleaner._clean_snippet_text(og_description.strip())
+            elif meta_description and len(meta_description.strip()) > 10:
+                description = self.cleaner._clean_snippet_text(meta_description.strip())
+            elif json_ld_description and len(json_ld_description.strip()) > 10:
+                description = self.cleaner._clean_snippet_text(json_ld_description.strip())
             
-            for desc_value, desc_type, base_score in descriptions:
-                if desc_value and len(desc_value.strip()) > 10:
-                    # Simplified scoring (faster)
-                    length = len(desc_value)
-                    score = base_score
-                    if 120 <= length <= 300:
-                        score += 2.0
-                    elif 80 <= length <= 400:
-                        score += 1.0
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_description = desc_value.strip()
-            
-            # Final description
-            if best_description:
-                description = self.cleaner._clean_snippet_text(best_description)
-            else:
+            if not description:
                 description = self.cleaner.create_description(cleaned_content)
             
-            # Step 6: Optimized keywords processing
+            # Step 8: Keyword and Category Extraction (simplified)
             original_keywords = page_meta.get('keywords', [])
             generated_keywords = self.cleaner.extract_keywords(cleaned_content)
             combined_keywords = self.cleaner.combine_keywords(original_keywords, generated_keywords, max_keywords=10)
             
-            # Step 8: Content analysis and scoring (using enhanced metadata)
-            content_type = self._determine_content_type(url, enhanced_metadata)
-            # Use enhanced metadata for categories instead of basic extracted_data
-            enhanced_metadata_for_categories = {
+            # Use simplified metadata for categories
+            metadata_for_categories = {
                 'title': title,
-                'description': enhanced_metadata.get('description', ''),
-                'author_info': enhanced_metadata.get('author_info', {}),
-                'structured_data': enhanced_metadata.get('structured_data', {})
+                'description': description,
+                'author_info': all_extracted_data.get('author_info', {}),
+                'structured_data': structured_data
             }
-            categories = self.scorer.get_content_categories(cleaned_content, enhanced_metadata_for_categories)
+            categories = self.scorer.get_content_categories(cleaned_content, metadata_for_categories)
             
+            # Step 9: Scoring (optimized)
+            content_type = self._determine_content_type(url, all_extracted_data)
             domain_score = self.scorer.calculate_domain_score(url)
             quality_score = self.scorer.calculate_content_quality_score(
-                cleaned_content, enhanced_metadata_for_categories, {}, html_content=html_content
+                cleaned_content, metadata_for_categories, {}, html_content=None  # Pass None to avoid re-parsing
             )
-            
-            # Step 9: Create document record with original metadata preservation
+
+            # Step 10: Create Document Record
             document_id = hashlib.md5(url.encode()).hexdigest()
-            
             document = Document(
                 document_id=document_id,
                 url=url,
@@ -335,58 +616,80 @@ class DocumentProcessor:
                 domain=domain,
                 description=description,
                 content_type=content_type,
-                categories=categories[:3],  # Limit categories
+                categories=categories[:3],
                 keywords=combined_keywords,
-                canonical_url=enhanced_metadata.get('canonical_url'),
-                published_date=enhanced_metadata.get('published_date'),
-                modified_date=enhanced_metadata.get('modified_date'),
-                author_info=enhanced_metadata.get('author_info'),
-                structured_data=enhanced_metadata.get('structured_data'),
-                images=enhanced_metadata.get('images'),
-                table_of_contents=enhanced_metadata.get('table_of_contents'),
-                semantic_info=enhanced_metadata.get('semantic_info'),
+                canonical_url=all_extracted_data.get('canonical_url'),
+                published_date=all_extracted_data.get('published_date'),
+                modified_date=all_extracted_data.get('modified_date'),
+                author_info=all_extracted_data.get('author_info'),
+                structured_data=structured_data,
+                images=all_extracted_data.get('images'),
+                table_of_contents=headings,
+                semantic_info=all_extracted_data.get('semantic_info'),
                 icons=page_meta.get('icons')
             )
-            
-            # Step 8: Optimized chunking (reduced overhead)
-            text_chunks = self.cleaner.intelligent_chunking(cleaned_content, preserve_context=True)
+
+            # Step 11: Chunking (on cleaned string only)
+            text_chunks = self.cleaner.intelligent_chunking(
+                cleaned_content, 
+                preserve_context=True
+            )
             if not text_chunks:
                 self.stats['content_too_short'] += 1
                 return None
-            
-            # Enhanced chunk quality filtering with better metrics
+
+            # Enhanced chunk quality filtering with size validation
             quality_chunks = []
+            max_chunk_chars = 8000  # Limit chunk size to prevent indexing issues
+            
             for chunk in text_chunks:
+                # Validate chunk size and quality
                 word_count = len(chunk.split())
-                # More flexible quality requirements for different content types
+                char_count = len(chunk)
                 min_words = 50 if content_type in ['article', 'blog', 'documentation'] else 30
                 
-                if word_count >= min_words:
+                # Apply both word count and character count limits
+                if word_count >= min_words and char_count <= max_chunk_chars:
                     quality_chunks.append(chunk)
+                elif char_count > max_chunk_chars:
+                    # If chunk is too large, try to split it further
+                    sentences = chunk.split('. ')
+                    current_chunk = ""
+                    
+                    for sentence in sentences:
+                        test_chunk = current_chunk + sentence + ". "
+                        if len(test_chunk) <= max_chunk_chars:
+                            current_chunk = test_chunk
+                        else:
+                            if current_chunk.strip() and len(current_chunk.split()) >= min_words:
+                                quality_chunks.append(current_chunk.strip())
+                            current_chunk = sentence + ". "
+                    
+                    # Add remaining content if it meets criteria
+                    if current_chunk.strip() and len(current_chunk.split()) >= min_words:
+                        quality_chunks.append(current_chunk.strip())
             
             if not quality_chunks:
                 self.stats['content_too_short'] += 1
                 return None
-            
-            # Step 11: Create chunk records with quality filtering
+
+            # Step 12: Create Chunk Records (optimized)
             document_chunks = []
             formatted_headings = self.cleaner.format_headings_for_index(headings)
             
             for i, chunk in enumerate(quality_chunks):
                 chunk_id = hashlib.md5(f"{document_id}_chunk_{i}".encode()).hexdigest()
-                chunk_keywords = self.cleaner.extract_keywords(chunk, max_keywords=8)  # Increased from 5
+                chunk_keywords = self.cleaner.extract_keywords(chunk, max_keywords=8)
                 
-                # Combine chunk-specific keywords with document keywords for richer search
+                # Combine chunk-specific keywords with document keywords
                 chunk_combined_keywords = list(dict.fromkeys(
-                    chunk_keywords + combined_keywords[:5]  # Top 5 document keywords
-                ))[:10]  # Limit to 10 total
+                    chunk_keywords + combined_keywords[:5]
+                ))[:10]
                 
                 chunk_word_count = len(chunk.split())
                 
-                # Calculate individual chunk quality score
-                chunk_quality_score = self.scorer.calculate_content_quality_score(
-                    chunk, enhanced_metadata_for_categories, {'word_count': chunk_word_count}
-                )
+                # Use document-level quality score for performance (avoids re-calculation)
+                chunk_quality_score = quality_score
                 
                 doc_chunk = DocumentChunk(
                     chunk_id=chunk_id,
@@ -401,13 +704,13 @@ class DocumentProcessor:
                 )
                 document_chunks.append(doc_chunk)
             
-            # Step 12: Log processing metrics
+            # Step 13: Performance logging (reduced frequency)
             processing_time = time.time() - start_time
             self.stats['successful_count'] += 1
             self.stats['total_processing_time'] += processing_time
             
-            # Reduced logging frequency (only for significant documents)
-            if len(quality_chunks) > 5 or processing_time > 2.0:
+            # Only log significant documents to reduce I/O overhead
+            if len(quality_chunks) > 5 or processing_time > 1.0:
                 raw_size_kb = len(html_content.encode("utf-8")) / 1024
                 clean_size_kb = len(cleaned_content.encode("utf-8")) / 1024
                 logger.info(

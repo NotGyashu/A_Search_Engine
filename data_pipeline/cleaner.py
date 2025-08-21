@@ -81,7 +81,8 @@ class ContentCleaner:
             'repetitive_phrases': re.compile(r'(.{10,}?)\1{2,}'),  # Remove 3+ repetitions
             'excessive_punctuation': re.compile(r'[.!?]{3,}'),
             'html_entities': re.compile(r'&[a-zA-Z0-9#]+;'),
-            'social_sharing': re.compile(r'\b(facebook|twitter|linkedin|instagram|youtube|share|like|follow)\b', re.IGNORECASE)
+            'social_sharing': re.compile(r'\b(facebook|twitter|linkedin|instagram|youtube|share|like|follow)\b', re.IGNORECASE),
+            'extractor_annotations': re.compile(r'# <(?:tech|api|fn)>(.*?)</(?:tech|api|fn)>')  # Remove HTML-like annotations
         }
     
     def clean_text(self, text: str) -> str:
@@ -89,22 +90,31 @@ class ContentCleaner:
         if not text:
             return ""
         
-        # Step 1: Remove navigation and boilerplate content
+        # Step 1: Remove extractor annotations first
+        text = self._remove_extractor_annotations(text)
+        
+        # Step 2: Remove navigation and boilerplate content
         text = self._remove_navigation_content(text)
         
-        # Step 2: Clean HTML entities and special characters
+        # Step 3: Clean HTML entities and special characters
         text = self._clean_html_entities(text)
         
-        # Step 3: Remove repetitive content
+        # Step 4: Remove repetitive content
         text = self._remove_repetitive_content(text)
         
-        # Step 4: Normalize whitespace
+        # Step 5: Normalize whitespace
         text = self._normalize_whitespace(text)
         
-        # Step 5: Remove social sharing artifacts
+        # Step 6: Remove social sharing artifacts
         text = self._remove_social_artifacts(text)
         
         return text.strip()
+    
+    def _remove_extractor_annotations(self, text: str) -> str:
+        """Remove HTML-like annotations added by the extractor."""
+        # Remove annotations and keep only the content inside them
+        text = self.patterns['extractor_annotations'].sub(r'\1', text)
+        return text
     
     def _remove_navigation_content(self, text: str) -> str:
         """Remove navigation and UI-related content."""

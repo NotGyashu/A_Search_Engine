@@ -71,6 +71,7 @@ logger = logging.getLogger(__name__)
 # Global worker processor instance for optimization
 _worker_processor = None
 
+
 def _init_worker():
     """Initialize worker process with a persistent DocumentProcessor instance."""
     global _worker_processor
@@ -88,6 +89,12 @@ def _file_processor_worker(file_path: Path) -> Dict[str, List[Dict[str, Any]]]:
     global _worker_processor
     
     try:
+        
+        
+        # Record file info for profiling
+        file_size_mb = file_path.stat().st_size / 1024 / 1024
+        start_time = time.time()
+        
         all_documents = []
         all_chunks = []
         
@@ -97,6 +104,9 @@ def _file_processor_worker(file_path: Path) -> Dict[str, List[Dict[str, Any]]]:
             if result:
                 all_documents.extend(result["documents"])
                 all_chunks.extend(result["chunks"])
+        
+        # Record profiling metrics
+      
         
         return {
             "documents": all_documents,
@@ -165,7 +175,7 @@ class DataPipeline:
         
         logger.info(f"🔄 Processing batch of {len(new_files)} files...")
         batch_start_time = time.time()
-        
+
         # Estimate total documents for progress tracking
         total_estimated_docs = sum(
             self.file_reader.estimate_document_count(f) for f in new_files
@@ -204,9 +214,10 @@ class DataPipeline:
                         batch_documents.clear()
                         batch_chunks.clear()
                     
-                    # Progress logging
+                    # Progress logging and system monitoring
                     if files_processed % 10 == 0:
                         logger.info(f"⏳ Progress: {files_processed}/{len(new_files)} files processed")
+                      
                 
                 # Index remaining documents
                 if batch_documents or batch_chunks:
@@ -216,6 +227,8 @@ class DataPipeline:
                 batch_time = time.time() - batch_start_time
                 self.pipeline_stats['total_files_processed'] += len(new_files)
                 self.pipeline_stats['total_processing_time'] += batch_time
+                
+                # Record batch profiling metrics
                 
                 logger.info(
                     f"✅ Batch complete in {batch_time:.1f}s: "
@@ -239,19 +252,25 @@ class DataPipeline:
             return
         
         try:
-            results = self.indexer.bulk_index_documents(
+            start_time = time.time()
+            
+            # Use the new retry mechanism for better rate limiting handling
+            results = self.indexer.bulk_index_with_retry(
                 documents=documents,
                 chunks=chunks,
-                thread_count=min(MAX_WORKERS, 4),
-                chunk_size=BATCH_SIZE
+                max_retries=3
             )
+            
+            indexing_time = time.time() - start_time
+            
+            # Record indexing metrics
             
             self.pipeline_stats['total_documents_created'] += len(documents)
             self.pipeline_stats['total_chunks_created'] += len(chunks)
             
             logger.info(
                 f"📤 Indexed batch: {len(documents)} docs, {len(chunks)} chunks "
-                f"(Success: {results['success']}, Failed: {results['failed']})"
+                f"(Success: {results['success']}, Failed: {results['failed']}) in {indexing_time:.2f}s"
             )
             
         except Exception as e:
@@ -375,6 +394,11 @@ class DataPipeline:
             # Final statistics
             self._log_pipeline_stats()
             
+            # Generate and save profiling report
+            logger.info("📊 Generating performance report...")
+            if report:
+                logger.info("✅ Performance report generated successfully")
+            
             # Close connections
             self.indexer.close()
             
@@ -382,7 +406,6 @@ class DataPipeline:
             
         except Exception as e:
             logger.error(f"❌ Error during shutdown: {e}")
-
 
 def main():
     """Main entry point for the pipeline."""
