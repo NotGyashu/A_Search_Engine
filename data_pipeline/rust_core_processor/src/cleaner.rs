@@ -7,8 +7,17 @@ use serde_json::Value;
 // Pre-compiled regex patterns for ultra-fast text cleaning
 static EXTRA_WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static HTML_ENTITIES: Lazy<Regex> = Lazy::new(|| Regex::new(r"&[a-zA-Z0-9#]+;").unwrap());
+static UNICODE_HTML_ENTITIES: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\\u003[cC]|\\u003[eE]|\\u0026|\\u0022|\\u0027|\\u003[aA]|\\u003[dD]").unwrap()
+});
 static NAVIGATION_WORDS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\b(?:home|menu|navigation|footer|header|sidebar|breadcrumb|skip|login|signup|register|search)\b").unwrap()
+    Regex::new(r"\b(?:diffhist|contribs|mobile\s+edit|visual\s+edit|android\s+app|ios\s+app|hidden\s+tag|wikiedu|dashboard|assignment\s+wizard|wikiloop|battlefield|user\s+creation|antivandal|rollback|manual\s+revert|tag\s+filter|namespace|template\s+talk|category\s+talk|portal\s+talk|module\s+talk|invert\s+selection|recent\s+changes\s+options|hide\s+registered|hide\s+unregistered|show\s+bots|hide\s+minor|edit\s+filter\s+log|village\s+pump|mailing\s+lists|wikipedia\s+signpost)\b").unwrap()
+});
+static INTERFACE_PATTERNS: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\b(?:diffhist|talk\s+contribs|Tags:|App\s+\w+|Mobile\s+edit|Visual\s+edit|Android\s+app|iOS\s+app|WikiEdu|WikiLoop|Dashboard|Wikifile|WINTR|User\s+creation|Account\s+\w+|AntiVandal|Rollback|Manual\s+revert|\+\d+|\-\d+|15:43|\[\d+\.\d+\]|\(testing\)|\(hidden\s+tag\))\b").unwrap()
+});
+static TECHNICAL_NOISE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\b(?:wikiedu\.org|dashboard\.wikiedu\.org|wikiloop|battlefield|assignment\s+wizard|user\s+analysis\s+tool|citation\s+bot|content\s+translation|crop\s+tool|dab\s+mechanic|edit\s+check|hotcat|huggle|iabot|management\s+console|quickcategories|swviewer|takedown\s+tools|torproxy|twinkle)\b").unwrap()
 });
 static SOCIAL_SHARING: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"\b(?:facebook|twitter|linkedin|instagram|youtube|share|like|follow|tweet|pin)\b").unwrap()
@@ -48,7 +57,7 @@ impl FastCleaner {
         }
     }
 
-    /// Main text cleaning function - ultra-optimized
+    /// Main text cleaning function - REVISED for targeted cleaning
     pub fn clean_text(&self, text: &str) -> String {
         if text.is_empty() {
             return String::new();
@@ -56,62 +65,32 @@ impl FastCleaner {
 
         let mut cleaned = text.to_string();
 
-        // Step 1: Remove navigation and social sharing content
-        cleaned = NAVIGATION_WORDS.replace_all(&cleaned, "").to_string();
-        cleaned = SOCIAL_SHARING.replace_all(&cleaned, "").to_string();
+        // Step 1: Remove specific MediaWiki noise patterns that might slip through
+        let vte_pattern = Regex::new(r"\s?vte\s").unwrap();
+        cleaned = vte_pattern.replace_all(&cleaned, " ").to_string();
+        
+        // Step 2: Remove Wikipedia-specific interface remnants
+        let wiki_noise = Regex::new(r"\b(?:diffhist|contribs|mobile\s+edit|visual\s+edit|android\s+app|ios\s+app|hidden\s+tag|wikiedu|dashboard|assignment\s+wizard|wikiloop|battlefield|user\s+creation|antivandal|rollback|manual\s+revert)\b").unwrap();
+        cleaned = wiki_noise.replace_all(&cleaned, " ").to_string();
 
-        // Step 2: Remove URLs and emails
-        cleaned = URL_PATTERN.replace_all(&cleaned, "").to_string();
-        cleaned = EMAIL_PATTERN.replace_all(&cleaned, "").to_string();
+        // Step 3: Remove URLs and emails from text content
+        cleaned = URL_PATTERN.replace_all(&cleaned, " ").to_string();
+        cleaned = EMAIL_PATTERN.replace_all(&cleaned, " ").to_string();
 
-        // Step 3: Clean HTML entities
+        // Step 4: Clean HTML entities and Unicode-encoded HTML entities
         cleaned = HTML_ENTITIES.replace_all(&cleaned, " ").to_string();
+        cleaned = UNICODE_HTML_ENTITIES.replace_all(&cleaned, " ").to_string();
 
-        // Step 4: Normalize punctuation
+        // Step 5: Normalize excessive punctuation
         cleaned = EXCESSIVE_PUNCT.replace_all(&cleaned, "...").to_string();
 
-        // Step 5: Normalize whitespace (final step)
-        cleaned = EXTRA_WHITESPACE.replace_all(&cleaned, " ").to_string();
+        // Step 6: Normalize all whitespace to single spaces (final step)
+        cleaned = EXTRA_WHITESPACE.replace_all(&cleaned, " ").trim().to_string();
 
-        // Step 6: Remove short lines and clean up (special handling for index pages)
-        let all_lines: Vec<&str> = cleaned.lines().map(|line| line.trim()).collect();
-        
-        let lines: Vec<&str> = cleaned
-            .lines()
-            .map(|line| line.trim())
-            .filter(|line| {
-                !line.is_empty() 
-                && line.len() > 2  // Reduced from 10 to 2 for index entries
-                && !self.is_navigation_line(line)
-                && !self.is_low_quality_line(line)
-            })
-            .collect();
+        // IMPORTANT: The old, aggressive line-by-line filtering is completely removed.
+        // The DOM cleaning in lib.rs is a much safer and more effective replacement.
 
-        let result = lines.join(" ").trim().to_string();
-        
-        // Special case: if we have very little content but the original had substantial content,
-        // use a much more permissive approach (likely an index page)
-        if result.len() < 200 && cleaned.len() > 5000 {
-            let very_permissive_lines: Vec<&str> = cleaned
-                .lines()
-                .map(|line| line.trim())
-                .filter(|line| {
-                    !line.is_empty() 
-                    && line.len() > 1
-                    && !line.to_lowercase().contains("javascript")
-                    && !line.to_lowercase().contains("cookie")
-                    && !line.to_lowercase().contains("privacy policy")
-                    && !line.to_lowercase().contains("terms of service")
-                })
-                .collect();
-            
-            let permissive_result = very_permissive_lines.join(" ").trim().to_string();
-            if permissive_result.len() > 500 {  // Only use if we get substantial content
-                return permissive_result;
-            }
-        }
-        
-        result
+        cleaned
     }
 
     /// Clean description text specifically
@@ -224,37 +203,86 @@ impl FastCleaner {
     fn is_navigation_line(&self, line: &str) -> bool {
         let line_lower = line.to_lowercase();
         
-        // Navigation indicators
+        // Enhanced navigation indicators for interface-heavy pages
         let nav_patterns = [
             "menu", "navigation", "nav", "breadcrumb", "skip to", "jump to",
-            "home page", "main menu", "site map", "sitemap"
+            "home page", "main menu", "site map", "sitemap", "recent changes",
+            "options", "filter", "hide", "show", "edit", "talk", "contribs",
+            "diff", "hist", "tags:", "mobile edit", "visual edit", "app",
+            "dashboard", "wizard", "tools", "list of", "invert selection"
         ];
 
-        nav_patterns.iter().any(|pattern| line_lower.contains(pattern))
+        // Check for interface patterns
+        let interface_patterns = [
+            "diffhist", "+", "−", "15:43", "[1.", "talk contribs",
+            "(hidden tag)", "android app", "ios app", "mobile web"
+        ];
+
+        nav_patterns.iter().any(|pattern| line_lower.contains(pattern)) ||
+        interface_patterns.iter().any(|pattern| line_lower.contains(pattern))
     }
 
     /// Check if a line is low quality content
     fn is_low_quality_line(&self, line: &str) -> bool {
         let line_lower = line.to_lowercase();
         
-        // Low quality indicators (be more selective for index pages)
+        // CRITICAL: Target CSS and styling content first
+        if line.contains(".mw-parser-output") || line.contains("navbox") ||
+           line.contains("display:") || line.contains("margin:") ||
+           line.contains("padding:") || line.contains("font-weight:") ||
+           line.contains("background-color:") || line.contains("border:") ||
+           line.contains("content:") || line.contains("::after") ||
+           line.contains("::before") || line.contains(".hlist") ||
+           line.contains("box-sizing:") || line.contains("line-height:") ||
+           line.contains("text-align:") || line.contains("white-space:") ||
+           line.contains("@media") || line.contains("counter-reset:") {
+            return true;
+        }
+        
+        // Target specific Wikipedia interface noise
+        let interface_noise = [
+            "wikiedu", "wikiloop", "dashboard", "assignment wizard", "battlefield",
+            "user creation", "account", "tag filter", "namespace", "protection template",
+            "edit summary", "citation bot", "content translation", "typos in one click",
+            "diffhist", "talk contribs", "mobile edit", "visual edit", "android app",
+            "ios app", "hidden tag", "antivandal", "rollback", "manual revert",
+            "vtePart of", "vteReligions", "Retrieved from", "Hidden categories:",
+            "Articles with", "Pages with", "Webarchive template", "Commons category"
+        ];
+
+        // Check for interface noise
+        if interface_noise.iter().any(|&noise| line_lower.contains(noise)) {
+            return true;
+        }
+
+        // Filter lines that are mostly version numbers and technical IDs
+        if line.chars().filter(|c| c.is_numeric() || "[]().".contains(*c)).count() > line.len() / 2 {
+            return true;
+        }
+
+        // Filter lines with excessive technical abbreviations (but be more lenient)
+        let tech_abbrevs = line.matches(|c: char| c.is_uppercase()).count();
+        if tech_abbrevs > 8 && line.len() < 150 {
+            return true;
+        }
+
+        // Standard quality checks
         let quality_issues = [
             "loading...", "please wait", "javascript", "enable javascript", 
             "cookies", "privacy policy", "terms of service", "copyright", 
             "all rights reserved"
         ];
 
-        // Check for quality issues
         if quality_issues.iter().any(|issue| line_lower.contains(issue)) {
             return true;
         }
 
         // For index pages, be much more permissive with punctuation
-        // Only filter if it's VERY excessive (more than 50% punctuation)
+        // Only filter if it's VERY excessive (more than 60% punctuation)
         let punct_count = line.chars().filter(|c| !c.is_alphanumeric() && !c.is_whitespace()).count();
         let total_chars = line.len();
         
-        if total_chars > 0 && (punct_count as f32 / total_chars as f32) > 0.5 {
+        if total_chars > 0 && (punct_count as f32 / total_chars as f32) > 0.6 {
             return true;
         }
 

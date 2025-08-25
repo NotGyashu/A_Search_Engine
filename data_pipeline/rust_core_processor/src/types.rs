@@ -11,11 +11,10 @@ pub struct ProcessedDocument {
     pub language: String,
     pub keywords: Vec<String>,
     
-    // Content structure
+    // Content structure - OPTIMIZED: Only primary image and essential headings
     pub headings: Vec<Heading>,
-    pub images: Vec<ImageInfo>,
-    pub links: Vec<LinkInfo>,
-    pub table_of_contents: Vec<Heading>,
+    pub primary_image: Option<ImageInfo>,  // Only the main/featured image
+    pub favicon: Option<String>,           // Only favicon URL
     
     // Content analysis
     pub word_count: usize,
@@ -23,21 +22,17 @@ pub struct ProcessedDocument {
     pub is_technical_content: bool,
     pub content_categories: Vec<String>,
     
-    // Metadata and structured data
-    pub canonical_url: String,
+    // Metadata - OPTIMIZED: Only essential fields
+    pub canonical_url: Option<String>,     // Only if different from URL
     pub published_date: Option<String>,
     pub modified_date: Option<String>,
-    pub author_info: AuthorInfo,
-    pub structured_data: StructuredData,
-    pub meta_tags: HashMap<String, String>,
-    pub open_graph: HashMap<String, String>,
-    pub twitter_cards: HashMap<String, String>,
+    pub author_name: Option<String>,       // Simplified author info
     
-    // Icons and favicon
-    pub icons: HashMap<String, String>,
+    // OPTIMIZED: Extracted essential structured data only
+    pub structured_meta: Option<StructuredMeta>,
     
-    // Chunking
-    pub text_chunks: Vec<String>,
+    // Chunking with context
+    pub text_chunks_with_context: Vec<ChunkWithContext>,
     
     // Semantic analysis
     pub semantic_info: SemanticInfo,
@@ -47,42 +42,37 @@ pub struct ProcessedDocument {
 pub struct Heading {
     pub level: u8,
     pub text: String,
-    pub id: String,
-    pub class: String,
+    // Removed: id, class (not useful for search)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageInfo {
     pub src: String,
     pub alt: String,
-    pub title: String,
-    pub width: String,
-    pub height: String,
+    // Removed: title, width, height (not essential for search)
 }
 
+// NEW: Optimized chunk with local context
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LinkInfo {
-    pub href: String,
-    pub text: String,
-    pub rel: Vec<String>,
-    pub title: String,
-    pub is_external: bool,
+pub struct ChunkWithContext {
+    pub text_chunk: String,
+    pub relevant_headings: Vec<String>,  // Only headings that apply to this chunk
+    pub chunk_index: usize,
 }
 
+// NEW: Essential structured data only
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthorInfo {
-    pub name: String,
-    pub url: String,
-    pub bio: String,
-    pub social_links: Vec<String>,
+pub struct StructuredMeta {
+    pub article_type: Option<String>,
+    pub featured_image: Option<String>,
+    pub date_published: Option<String>,
+    pub date_modified: Option<String>,
+    pub publisher_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StructuredData {
-    pub json_ld: Vec<serde_json::Value>,
-    pub microdata: Vec<HashMap<String, String>>,
-    pub rdfa: Vec<HashMap<String, String>>,
-}
+// REMOVED: LinkInfo (not essential for search)
+// REMOVED: AuthorInfo (simplified to author_name string)
+// REMOVED: StructuredData (replaced with StructuredMeta)
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SemanticInfo {
@@ -109,48 +99,24 @@ impl Default for ProcessedDocument {
             language: String::new(),
             keywords: Vec::new(),
             headings: Vec::new(),
-            images: Vec::new(),
-            links: Vec::new(),
-            table_of_contents: Vec::new(),
+            primary_image: None,
+            favicon: None,
             word_count: 0,
             content_quality_score: 0.0,
             is_technical_content: false,
             content_categories: Vec::new(),
-            canonical_url: String::new(),
+            canonical_url: None,
             published_date: None,
             modified_date: None,
-            author_info: AuthorInfo::default(),
-            structured_data: StructuredData::default(),
-            meta_tags: HashMap::new(),
-            open_graph: HashMap::new(),
-            twitter_cards: HashMap::new(),
-            icons: HashMap::new(),
-            text_chunks: Vec::new(),
+            author_name: None,
+            structured_meta: None,
+            text_chunks_with_context: Vec::new(),
             semantic_info: SemanticInfo::default(),
         }
     }
 }
 
-impl Default for AuthorInfo {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            url: String::new(),
-            bio: String::new(),
-            social_links: Vec::new(),
-        }
-    }
-}
-
-impl Default for StructuredData {
-    fn default() -> Self {
-        Self {
-            json_ld: Vec::new(),
-            microdata: Vec::new(),
-            rdfa: Vec::new(),
-        }
-    }
-}
+// Removed old default implementations for deleted types
 
 impl Default for SemanticInfo {
     fn default() -> Self {
@@ -177,8 +143,6 @@ impl ToPyObject for Heading {
         let dict = pyo3::types::PyDict::new_bound(py);
         dict.set_item("level", self.level).unwrap();
         dict.set_item("text", &self.text).unwrap();
-        dict.set_item("id", &self.id).unwrap();
-        dict.set_item("class", &self.class).unwrap();
         dict.into()
     }
 }
@@ -188,48 +152,38 @@ impl ToPyObject for ImageInfo {
         let dict = pyo3::types::PyDict::new_bound(py);
         dict.set_item("src", &self.src).unwrap();
         dict.set_item("alt", &self.alt).unwrap();
-        dict.set_item("title", &self.title).unwrap();
-        dict.set_item("width", &self.width).unwrap();
-        dict.set_item("height", &self.height).unwrap();
         dict.into()
     }
 }
 
-impl ToPyObject for LinkInfo {
+impl ToPyObject for ChunkWithContext {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         let dict = pyo3::types::PyDict::new_bound(py);
-        dict.set_item("href", &self.href).unwrap();
-        dict.set_item("text", &self.text).unwrap();
-        dict.set_item("rel", &self.rel).unwrap();
-        dict.set_item("title", &self.title).unwrap();
-        dict.set_item("is_external", self.is_external).unwrap();
+        dict.set_item("text_chunk", &self.text_chunk).unwrap();
+        dict.set_item("relevant_headings", &self.relevant_headings).unwrap();
+        dict.set_item("chunk_index", self.chunk_index).unwrap();
         dict.into()
     }
 }
 
-impl ToPyObject for AuthorInfo {
+impl ToPyObject for StructuredMeta {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         let dict = pyo3::types::PyDict::new_bound(py);
-        dict.set_item("name", &self.name).unwrap();
-        dict.set_item("url", &self.url).unwrap();
-        dict.set_item("bio", &self.bio).unwrap();
-        dict.set_item("social_links", &self.social_links).unwrap();
-        dict.into()
-    }
-}
-
-impl ToPyObject for StructuredData {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        let dict = pyo3::types::PyDict::new_bound(py);
-        
-        // Convert JSON values to strings for Python compatibility
-        let json_ld_strs: Vec<String> = self.json_ld.iter()
-            .map(|v| serde_json::to_string(v).unwrap_or_default())
-            .collect();
-        
-        dict.set_item("json_ld", json_ld_strs).unwrap();
-        dict.set_item("microdata", &self.microdata).unwrap();
-        dict.set_item("rdfa", &self.rdfa).unwrap();
+        if let Some(ref article_type) = self.article_type {
+            dict.set_item("article_type", article_type).unwrap();
+        }
+        if let Some(ref featured_image) = self.featured_image {
+            dict.set_item("featured_image", featured_image).unwrap();
+        }
+        if let Some(ref date_published) = self.date_published {
+            dict.set_item("date_published", date_published).unwrap();
+        }
+        if let Some(ref date_modified) = self.date_modified {
+            dict.set_item("date_modified", date_modified).unwrap();
+        }
+        if let Some(ref publisher_name) = self.publisher_name {
+            dict.set_item("publisher_name", publisher_name).unwrap();
+        }
         dict.into()
     }
 }

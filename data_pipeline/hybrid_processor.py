@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class Document:
-    """Represents the metadata for a single document (optimized)."""
+    """Represents the metadata for a single document (OPTIMIZED for size reduction)."""
    
     document_id: str
     url: str
@@ -45,30 +45,39 @@ class Document:
     content_type: str
     categories: List[str]
     keywords: List[str]
+    
+    # OPTIMIZED: Only store if different from URL
     canonical_url: Optional[str] = None
     published_date: Optional[str] = None
     modified_date: Optional[str] = None
-    author_info: Optional[Dict[str, Any]] = None
-    structured_data: Optional[Dict[str, Any]] = None
-    images: Optional[List[Dict[str, Any]]] = None
-    table_of_contents: Optional[List[Dict[str, Any]]] = None
+    
+    # OPTIMIZED: Simplified author info (just name)
+    author_name: Optional[str] = None
+    
+    # OPTIMIZED: Essential structured data only
+    structured_meta: Optional[Dict[str, Any]] = None
+    
+    # OPTIMIZED: Only primary image and favicon
+    primary_image: Optional[Dict[str, str]] = None
+    favicon: Optional[str] = None
+    
+    # OPTIMIZED: Essential semantic info only
     semantic_info: Optional[Dict[str, Any]] = None
-    icons: Optional[Dict[str, str]] = None
 
 
 @dataclass(slots=True)
 class DocumentChunk:
-    """Represents an indexable chunk of a document (matching processor.py schema)."""
+    """Represents an indexable chunk of a document (OPTIMIZED - no redundant fields)."""
 
     chunk_id: str
     document_id: str
     text_chunk: str
-    headings: str
-    domain_score: float
-    quality_score: float
+    relevant_headings: List[str]  # OPTIMIZED: Only relevant headings, not full JSON
+    chunk_index: int
     word_count: int
-    content_categories: List[str]
-    keywords: List[str]
+    
+    # REMOVED: domain_score, quality_score, content_categories, keywords
+    # These are now only stored in the parent Document to avoid duplication
 
 
 class HybridDocumentProcessor:
@@ -152,7 +161,7 @@ class HybridDocumentProcessor:
         return document, chunks
 
     def _create_document_from_rust_result(self, rust_result: Dict, url: str, domain: str = None) -> Document:
-        """Create a Document object from Rust processing results."""
+        """Create a Document object from Rust processing results (OPTIMIZED)."""
         if domain is None:
             from urllib.parse import urlparse
             domain = urlparse(url).netloc
@@ -161,39 +170,7 @@ class HybridDocumentProcessor:
         content_hash = hashlib.sha256(rust_result['main_content'].encode()).hexdigest()[:12]
         document_id = f"doc_{content_hash}_{int(time.time())}"
         
-        # Convert Rust headings to Python format
-        table_of_contents = []
-        for heading in rust_result.get('headings', []):
-            table_of_contents.append({
-                'level': heading['level'],
-                'text': heading['text'],
-                'anchor': heading.get('id', heading['text'].lower().replace(' ', '-'))
-            })
-        
-        # Convert Rust images to Python format
-        images = []
-        for img in rust_result.get('images', []):
-            images.append({
-                'src': img['src'],
-                'alt': img['alt'],
-                'title': img.get('title', '')
-            })
-        
-        # Extract structured data properly
-        structured_data = {'json_ld': [], 'microdata': [], 'rdfa': []}
-        if rust_result.get('json_ld'):
-            structured_data['json_ld'] = rust_result['json_ld']
-        if rust_result.get('structured_data'):
-            # Handle Rust structured_data object
-            rust_sd = rust_result['structured_data']
-            if rust_sd.get('json_ld'):
-                structured_data['json_ld'] = rust_sd['json_ld']
-            if rust_sd.get('microdata'):
-                structured_data['microdata'] = rust_sd['microdata']
-            if rust_sd.get('rdfa'):
-                structured_data['rdfa'] = rust_sd['rdfa']
-        
-        # Get content categories using centralized logic from scorer
+        # OPTIMIZED: Get content categories using centralized logic from scorer
         main_content = rust_result.get('main_content', '')
         title = rust_result.get('title', '')
         description = rust_result.get('description', '')
@@ -203,17 +180,10 @@ class HybridDocumentProcessor:
             rust_result
         )[:3]  # Limit to top 3 categories
         
-        # Extract author info properly from Rust - convert to Python format
-        author_info = None
-        rust_author = rust_result.get('author_info', {})
-        if rust_author and (rust_author.get('name') or rust_author.get('url')):
-            author_info = {}
-            if rust_author.get('name'):
-                author_info['meta_author'] = rust_author['name']
-            if rust_author.get('url'):
-                author_info['author_url'] = rust_author['url']
-            if rust_author.get('bio'):
-                author_info['author_bio'] = rust_author['bio']
+        # OPTIMIZED: Only store canonical URL if different from URL
+        canonical_url = rust_result.get('canonical_url')
+        if canonical_url == url:
+            canonical_url = None
         
         return Document(
             document_id=document_id,
@@ -222,63 +192,45 @@ class HybridDocumentProcessor:
             domain=domain,
             description=rust_result.get('description', ''),
             content_type=self._determine_content_type(url, rust_result),
-            categories=categories,  # Use document-level categories
-            keywords=rust_result.get('keywords', []),
-            canonical_url=rust_result.get('canonical_url', url),  # Use Rust extracted canonical URL
-            published_date=rust_result.get('published_date'),  # Use Rust extracted dates
+            categories=categories,
+            keywords=rust_result.get('keywords', [])[:10],  # Limit to 10 keywords
+            canonical_url=canonical_url,
+            published_date=rust_result.get('published_date'),
             modified_date=rust_result.get('modified_date'),
-            author_info=author_info,  # Use properly converted Rust author info
-            structured_data=structured_data if any(structured_data.values()) else None,
-            images=images,
-            table_of_contents=table_of_contents,
+            author_name=rust_result.get('author_name'),
+            structured_meta=rust_result.get('structured_meta'),
+            primary_image=rust_result.get('primary_image'),
+            favicon=rust_result.get('favicon'),
             semantic_info={
                 'word_count': rust_result.get('word_count', 0),
                 'content_quality_score': rust_result.get('content_quality_score', 0.0),
                 'is_technical_content': rust_result.get('is_technical_content', False),
-                'headings_count': len(table_of_contents),
-                'images_count': len(images)
-            },
-            icons=rust_result.get('icons')  # Use Rust extracted icons
+                'domain_score': self.scorer.calculate_domain_score(url)
+            }
         )
 
     def _create_chunks_from_rust_result(self, rust_result: Dict, document_id: str) -> List[DocumentChunk]:
-        """Create DocumentChunk objects from Rust processing results."""
+        """Create DocumentChunk objects from Rust processing results (OPTIMIZED)."""
         chunks = []
-        text_chunks = rust_result.get('text_chunks', [])
+        chunks_with_context = rust_result.get('text_chunks_with_context', [])
         
-        # Get document-level data for chunk creation
-        headings = rust_result.get('table_of_contents', [])
-        formatted_headings = json.dumps(headings) if headings else "[]"
-        
-        for i, chunk_content in enumerate(text_chunks):
-            chunk_id = f"{document_id}_chunk_{i}"
+        for chunk_data in chunks_with_context:
+            chunk_id = f"{document_id}_chunk_{chunk_data['chunk_index']}"
+            word_count = len(chunk_data['text_chunk'].split())
             
-            # Extract keywords for this chunk from Rust processing
-            chunk_keywords = rust_result.get('keywords', [])[:8]  # Use Rust-extracted keywords
-            
-            # Calculate metrics for this chunk
-            word_count = len(chunk_content.split())
-            
-            # Use document-level scores as defaults (can be enhanced later)
-            domain_score = rust_result.get('content_quality_score', 0.5)
-            quality_score = rust_result.get('content_quality_score', 0.5)
-            
-            # Use centralized categorization from scorer for chunks
-            content_categories = self.scorer.get_content_categories(chunk_content, {})
-            
-            # Create chunk with correct schema from processor.py
+            # OPTIMIZED: No redundant domain_score, quality_score, content_categories, keywords
+            # These are stored only in the parent Document
             chunk = DocumentChunk(
                 chunk_id=chunk_id,
                 document_id=document_id,
-                text_chunk=chunk_content,  # ✅ Correct field name
-                headings=formatted_headings,  # ✅ Correct field name
-                domain_score=domain_score,  # ✅ Required field
-                quality_score=quality_score,  # ✅ Required field
-                word_count=word_count,  # ✅ Required field
-                content_categories=content_categories,  # ✅ Required field
-                keywords=chunk_keywords  # ✅ Required field
+                text_chunk=chunk_data['text_chunk'],
+                relevant_headings=chunk_data['relevant_headings'],  # OPTIMIZED: Only relevant headings
+                chunk_index=chunk_data['chunk_index'],
+                word_count=word_count
             )
             chunks.append(chunk)
+        
+        return chunks
         
         return chunks
 
