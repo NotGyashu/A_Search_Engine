@@ -3,13 +3,13 @@
 ISM Policy Management Script
 
 This script helps manage Index State Management (ISM) policies for the search engine pipeline.
-Use this script to manually create, update, or verify ISM policies.
+Use this script to manually create, update, or verify ISM policies with the standalone indexer.
 """
 
 import json
 import os
 from pathlib import Path
-from indexer import OpenSearchIndexer
+from comprehensive_indexer import ComprehensiveStandaloneIndexer
 
 def load_ism_policy(policy_file: str = "ism_policy.json") -> dict:
     """Load ISM policy from JSON file."""
@@ -25,8 +25,8 @@ def create_ism_policy(retention_days: int = 90, dry_run: bool = False):
         print("📝 DRY RUN MODE - No changes will be made")
     
     try:
-        # Initialize indexer
-        indexer = OpenSearchIndexer()
+        # Initialize comprehensive indexer
+        indexer = ComprehensiveStandaloneIndexer()
         
         if not indexer.client:
             print("❌ Failed to connect to OpenSearch")

@@ -1,0 +1,5 @@
+opensearch-py>=2.3.0
+boto3>=1.26.0
+requests-aws4auth>=1.1.2
+python-dotenv>=1.0.0
+python-dateutil

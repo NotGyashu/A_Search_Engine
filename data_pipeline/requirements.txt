@@ -1,10 +1,7 @@
 trafilatura
 beautifulsoup4
-opensearch-py
 python-dotenv
 lxml
 requests
 tqdm
-boto3
-requests-aws4auth
 ijson

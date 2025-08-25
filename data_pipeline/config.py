@@ -35,6 +35,8 @@ class PipelineConfig:
     # File processing
     SUPPORTED_FORMATS = ['json', 'jsonl']
     MAX_FILE_SIZE_MB = int(os.getenv('MAX_FILE_SIZE_MB', '100'))
+    OUTPUT_DIR = os.getenv('PIPELINE_OUTPUT_DIR', 'processed_output')
+    QUALITY_REPORTS_DIR = os.getenv('QUALITY_REPORTS_DIR', 'quality_reports')
     
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

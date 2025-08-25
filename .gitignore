@@ -14,6 +14,7 @@ dp-venv
 ai-venv
 be-venv
 Doxyfile
+i-venv
 # Python caches and compiled files
 __pycache__/
 *.py[cod]
@@ -65,4 +66,9 @@ data/backlog_urls.txt
 
 #cache files
 /crawler/cache/
-
+quality_reports
+processed_output
+toIndex
+#rust files
+target
+Cargo.lock
