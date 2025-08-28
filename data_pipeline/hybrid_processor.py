@@ -53,10 +53,8 @@ class Document:
     
     # OPTIMIZED: Simplified author info (just name)
     author_name: Optional[str] = None
-    
-    # OPTIMIZED: Essential structured data only
-    structured_meta: Optional[Dict[str, Any]] = None
-    
+
+
     # OPTIMIZED: Only primary image and favicon
     primary_image: Optional[Dict[str, str]] = None
     favicon: Optional[str] = None
@@ -105,30 +103,17 @@ class HybridDocumentProcessor:
         }
 
     def process_document(self, html_content: str, url: str, domain: str = None) -> tuple[Document, List[DocumentChunk]]:
-        """
-        Process a document using the hybrid Rust/Python approach.
+        return self._process_with_rust(html_content, url, domain)
         
-        Returns:
-            tuple: (Document metadata, List of content chunks)
-        """
-        start_time = time.time()
-        
-        try:
-            # Process with Rust core (only option in production)
-            return self._process_with_rust(html_content, url, domain)
-        finally:
-            total_time = time.time() - start_time
-            self._update_stats(total_time)
+
 
     def _process_with_rust(self, html_content: str, url: str, domain: str = None) -> tuple[Document, List[DocumentChunk]]:
         """Process document using the ultra-fast Rust core."""
         
-        # Ultra-fast language filtering using Rust (bypasses Python entirely)
-        # This is now handled at the Rust level for maximum performance
         if not is_english_fast(html_content[:2000], url):  # Check first 2K chars for speed
             logger.info(f"Filtering out non-English page: {url}")
             return None, []  # Skip non-English pages entirely
-        
+
         rust_start = time.time()
         
         # Call the Rust core processor - now includes ultra-fast language detection
@@ -143,7 +128,7 @@ class HybridDocumentProcessor:
             return None, []
         
         python_start = time.time()
-        
+
         # Create document from Rust results
         document = self._create_document_from_rust_result(rust_result, url, domain)
         
@@ -175,10 +160,7 @@ class HybridDocumentProcessor:
         title = rust_result.get('title', '')
         description = rust_result.get('description', '')
         
-        categories = self.scorer.get_content_categories(
-            f"{title} {description} {main_content}", 
-            rust_result
-        )[:3]  # Limit to top 3 categories
+        categories = rust_result.get('content_categories', '')
         
         # OPTIMIZED: Only store canonical URL if different from URL
         canonical_url = rust_result.get('canonical_url')
@@ -198,7 +180,6 @@ class HybridDocumentProcessor:
             published_date=rust_result.get('published_date'),
             modified_date=rust_result.get('modified_date'),
             author_name=rust_result.get('author_name'),
-            structured_meta=rust_result.get('structured_meta'),
             primary_image=rust_result.get('primary_image'),
             favicon=rust_result.get('favicon'),
             semantic_info={
@@ -218,7 +199,6 @@ class HybridDocumentProcessor:
             chunk_id = f"{document_id}_chunk_{chunk_data['chunk_index']}"
             word_count = len(chunk_data['text_chunk'].split())
             
-            # OPTIMIZED: No redundant domain_score, quality_score, content_categories, keywords
             # These are stored only in the parent Document
             chunk = DocumentChunk(
                 chunk_id=chunk_id,
@@ -232,14 +212,10 @@ class HybridDocumentProcessor:
         
         return chunks
         
-        return chunks
 
     def _enhance_document_with_python(self, document: Document, rust_result: Dict) -> Document:
         """Enhance the document with Python-based analysis."""
         try:
-            # Language detection is now handled in Rust for maximum performance
-            # No need for additional Python language detection
-            
             # Content scoring and categorization
             score_result = self.scorer.calculate_content_quality_score(
                 content=rust_result.get('main_content', ''),
@@ -252,17 +228,6 @@ class HybridDocumentProcessor:
                     'word_count': rust_result.get('word_count', 0)
                 }
             )
-            
-            # Simple category assignment based on content
-            categories = []
-            content_lower = rust_result.get('main_content', '').lower()
-            if any(tech_word in content_lower for tech_word in ['code', 'programming', 'api', 'software']):
-                categories.append('technology')
-            if any(news_word in content_lower for news_word in ['news', 'breaking', 'update']):
-                categories.append('news')
-            
-            # Update categories
-            document.categories = categories
             
             # Update semantic info with quality score
             if document.semantic_info:
@@ -278,6 +243,9 @@ class HybridDocumentProcessor:
 
     def _determine_content_type(self, url: str, rust_result: Dict) -> str:
         """Determine content type from URL and metadata."""
+        if(rust_result.get('content_type')):
+            return rust_result.get('content_type')
+
         content_type = "article"  # default
         
         description = rust_result.get('description', '').lower()
@@ -288,12 +256,6 @@ class HybridDocumentProcessor:
             content_type = "blog"
         
         return content_type
-
-    def _create_document_from_python_data(self, processed_data: Dict, content: str, url: str, domain: str) -> Document:
-        """Create Document from Python processing (fallback method)."""
-        # This would be the original implementation
-        # Simplified for brevity - use existing logic from processor.py
-        pass
 
     def _create_chunks_from_content(self, text_chunks: List[str], document_id: str) -> List[DocumentChunk]:
         """Create chunks from text content (fallback method)."""
@@ -310,70 +272,3 @@ class HybridDocumentProcessor:
             chunks.append(chunk)
         return chunks
 
-    def _update_stats(self, total_time: float):
-        """Update processing statistics."""
-        self.processing_stats['total_processed'] += 1
-        self.processing_stats['total_time'] += total_time
-        self.processing_stats['average_time_per_doc'] = (
-            self.processing_stats['total_time'] / self.processing_stats['total_processed']
-        )
-
-    def get_performance_stats(self) -> Dict[str, Any]:
-        """Get current performance statistics."""
-        stats = self.processing_stats.copy()
-        stats['using_rust'] = self.use_rust
-        stats['rust_percentage'] = (
-            (self.processing_stats['rust_time'] / self.processing_stats['total_time'] * 100)
-            if self.processing_stats['total_time'] > 0 else 0
-        )
-        return stats
-
-    def _extract_all_from_soup(self, soup):
-        """Fallback method for Python-only processing."""
-        # Original implementation would go here
-        return {}
-
-    def _process_raw_data(self, raw_data: Dict, url: str) -> Dict:
-        """Fallback method for Python-only processing.""" 
-        # Original implementation would go here
-        return {}
-
-
-# Maintain backward compatibility
-DocumentProcessor = HybridDocumentProcessor
-
-if __name__ == "__main__":
-    # Test the hybrid processor
-    processor = HybridDocumentProcessor()
-    
-    # Test with sample HTML
-    test_html = """
-    <html>
-    <head>
-        <title>Test Page</title>
-        <meta name="description" content="This is a test page for the hybrid processor">
-    </head>
-    <body>
-        <h1>Main Heading</h1>
-        <p>This is the main content of the test page. It should be processed quickly by the Rust core.</p>
-        <h2>Secondary Heading</h2>
-        <p>More content here with <a href="/link">some links</a> and other elements.</p>
-    </body>
-    </html>
-    """
-    
-    start_time = time.time()
-    document, chunks = processor.process_document(test_html, "https://example.com/test")
-    processing_time = time.time() - start_time
-    
-    print(f"\n🚀 Processing completed in {processing_time:.4f} seconds")
-    print(f"📄 Document: {document.title}")
-    print(f"📝 Description: {document.description}")
-    print(f"🔤 Word count: {document.semantic_info['word_count'] if document.semantic_info else 'N/A'}")
-    print(f"📊 Chunks created: {len(chunks)}")
-    print(f"⚡ Using Rust: {processor.use_rust}")
-    
-    stats = processor.get_performance_stats()
-    print(f"\n📈 Performance Stats:")
-    for key, value in stats.items():
-        print(f"  {key}: {value}")
