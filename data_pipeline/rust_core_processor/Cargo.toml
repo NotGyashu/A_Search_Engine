@@ -19,3 +19,4 @@ rayon = "1.8"  # For parallel processing
 unicode-segmentation = "1.10"
 whatlang = "0.16"  # Ultra-fast language detection
 chrono = { version = "0.4", features = ["serde"] }  # For proper date parsing
+rust-stemmers = "1.2.0"

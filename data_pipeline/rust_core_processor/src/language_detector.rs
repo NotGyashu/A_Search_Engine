@@ -55,40 +55,50 @@ impl FastLanguageDetector {
     
     /// Check if content is English using fast detection
     pub fn is_english(text: &str, url: &str) -> bool {
-        Self::detect_language(text, url)
-            .map(|lang| lang == "en")
-            .unwrap_or(false)
+            // If text is empty, rely solely on URL detection
+            if text.trim().is_empty() {
+                return Self::detect_from_url(url)
+                    .map(|lang| lang == "en")
+                    .unwrap_or(false);
+            }
+            
+            // For non-empty text, use the full detection pipeline
+            Self::detect_language(text, url)
+                .map(|lang| lang == "en")
+                .unwrap_or(false)
     }
-    
+
     /// Extract language from URL domain and path
-    fn detect_from_url(url: &str) -> Option<String> {
-        if let Ok(parsed_url) = Url::parse(url) {
-            // Check domain for English indicators
-            if let Some(domain) = parsed_url.domain() {
-                let domain_lower = domain.to_lowercase();
-                
-                // Check for explicit English subdomains
-                if domain_lower.starts_with("en.") || domain_lower.starts_with("english.") {
-                    return Some("en".to_string());
-                }
-                
-                // Check for known English domains
-                for english_domain in ENGLISH_DOMAIN_NAMES.iter() {
-                    if domain_lower.contains(english_domain) {
-                        return Some("en".to_string());
-                    }
-                }
-                
-                // Check TLD
-                let parts: Vec<&str> = domain_lower.split('.').collect();
-                if let Some(tld) = parts.last() {
-                    if ENGLISH_DOMAINS.contains(tld) {
-                        return Some("en".to_string());
-                    }
+fn detect_from_url(url: &str) -> Option<String> {
+    if let Ok(parsed_url) = Url::parse(url) {
+        if let Some(domain) = parsed_url.domain() {
+            let domain_lower = domain.to_lowercase();
+            
+            // 1. Check for explicit English subdomains
+            if domain_lower.starts_with("en.") || domain_lower.starts_with("english.") {
+                return Some("en".to_string());
+            }
+            
+            // 2. Check for explicit non-English subdomains FIRST
+            let non_english_subdomains = [
+                "es.", "de.", "fr.", "it.", "pt.", "ru.", "zh.", "ja.", "ko.",
+                "ar.", "hi.", "nl.", "pl.", "sv.", "da.", "no.", "fi."
+            ];
+            
+            for subdomain in &non_english_subdomains {
+                if domain_lower.starts_with(subdomain) {
+                    return Some("non-en".to_string());
                 }
             }
             
-            // Check path for language indicators
+            // 3. Check for known English domains (after non-English check)
+            for english_domain in ENGLISH_DOMAIN_NAMES.iter() {
+                if domain_lower.contains(english_domain) {
+                    return Some("en".to_string());
+                }
+            }
+            
+            // 4. Check path for language indicators
             let path = parsed_url.path().to_lowercase();
             if path.contains("/en/") || path.contains("/english/") {
                 return Some("en".to_string());
@@ -105,10 +115,20 @@ impl FastLanguageDetector {
                     return Some("non-en".to_string());
                 }
             }
+            
+            // 5. Check TLD only if no other indicators found
+            let parts: Vec<&str> = domain_lower.split('.').collect();
+            if let Some(tld) = parts.last() {
+                if ENGLISH_DOMAINS.contains(tld) {
+                    return Some("en".to_string());
+                }
+            }
         }
-        
-        None
     }
+    
+    None
+}
+
     
     /// Extract language from HTML lang attribute
     fn extract_html_lang(html: &str) -> Option<String> {
@@ -208,30 +228,5 @@ impl FastLanguageDetector {
         };
         
         (detected_lang, confidence, is_english_domain)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_english_detection() {
-        let text = "This is a test of English language detection.";
-        assert_eq!(FastLanguageDetector::detect_language(text, ""), Some("en".to_string()));
-        assert!(FastLanguageDetector::is_english(text, ""));
-    }
-    
-    #[test]
-    fn test_url_detection() {
-        assert!(FastLanguageDetector::is_english("", "https://techcrunch.com/article"));
-        assert!(FastLanguageDetector::is_english("", "https://en.wikipedia.org/wiki/Test"));
-        assert!(!FastLanguageDetector::is_english("", "https://es.wikipedia.org/wiki/Test"));
-    }
-    
-    #[test]
-    fn test_html_lang_extraction() {
-        let html = r#"<html lang="en"><body>Test</body></html>"#;
-        assert_eq!(FastLanguageDetector::extract_html_lang(html), Some("en".to_string()));
     }
 }

@@ -1,4 +1,6 @@
-mod optimized;
+pub mod metadata_extractor;
+pub mod optimized;
+pub mod main_content_extractor;
 pub use optimized::OptimizedExtractor;
 
 // Re-export for compatibility  

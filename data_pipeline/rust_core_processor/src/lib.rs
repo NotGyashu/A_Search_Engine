@@ -19,47 +19,58 @@ static WHITESPACE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap())
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r#"https?://[^\s<>"']+"#).unwrap()
 });
-
-// Regex patterns for removing unwanted HTML tags and their content
-static SCRIPT_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<script[^>]*>.*?</script>").unwrap()
-});
-static STYLE_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<style[^>]*>.*?</style>").unwrap()
-});
-static NOSCRIPT_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<noscript[^>]*>.*?</noscript>").unwrap()
-});
-static NAV_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<nav[^>]*>.*?</nav>").unwrap()
-});
-static FOOTER_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<footer[^>]*>.*?</footer>").unwrap()
-});
-static HEADER_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<header[^>]*>.*?</header>").unwrap()
-});
-
-/// Remove unwanted HTML tags and their content before parsing
+/// Remove unwanted HTML tags and their content before main content extraction
 fn remove_unwanted_tags(html: &str) -> String {
     let mut cleaned = html.to_string();
+
+    // Remove script tags BUT preserve JSON-LD (using closure approach)
+    static SCRIPT_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?is)<script([^>]*)>(.*?)</script>").unwrap()
+    });
     
-    // Remove script tags and all their content
-    cleaned = SCRIPT_TAG_REGEX.replace_all(&cleaned, "").to_string();
-    
-    // Remove style tags and all their content (this solves the CSS problem!)
+    cleaned = SCRIPT_TAG_REGEX.replace_all(&cleaned, |caps: &regex::Captures| {
+        let attributes = caps.get(1).map_or("", |m| m.as_str()).to_lowercase();
+        
+        // Check if this is a JSON-LD script (case insensitive)
+        if attributes.contains("application/ld+json") || 
+           attributes.contains("ld+json") {
+            // Preserve the entire JSON-LD script tag
+            caps[0].to_string()
+        } else {
+            // Remove non-JSON-LD scripts
+            String::new()
+        }
+    }).to_string();
+
+    // Remove style tags
+    static STYLE_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap()
+    });
     cleaned = STYLE_TAG_REGEX.replace_all(&cleaned, "").to_string();
-    
-    // Remove noscript tags and content
+
+    // Remove noscript tags
+    static NOSCRIPT_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?is)<noscript[^>]*>.*?</noscript>").unwrap()
+    });
     cleaned = NOSCRIPT_TAG_REGEX.replace_all(&cleaned, "").to_string();
-    
-    // Remove navigation elements (often contain menu noise)
+
+    // Remove navigation elements
+    static NAV_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?is)<nav[^>]*>.*?</nav>").unwrap()
+    });
     cleaned = NAV_TAG_REGEX.replace_all(&cleaned, "").to_string();
-    
-    // Remove headers and footers (often contain site-wide navigation)
+
+    // Remove headers and footers
+    static HEADER_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?is)<header[^>]*>.*?</header>").unwrap()
+    });
     cleaned = HEADER_TAG_REGEX.replace_all(&cleaned, "").to_string();
+
+    static FOOTER_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?is)<footer[^>]*>.*?</footer>").unwrap()
+    });
     cleaned = FOOTER_TAG_REGEX.replace_all(&cleaned, "").to_string();
-    
+
     cleaned
 }
 
@@ -107,9 +118,8 @@ fn process_html(html_content: String, url: String) -> PyResult<PyObject> {
             dict.set_item("main_content", &doc.main_content)?;
             dict.set_item("title", &doc.title)?;
             dict.set_item("description", &doc.description)?;
-            dict.set_item("language", &doc.language)?;
+            dict.set_item("content_categories", &doc.content_categories)?;
             dict.set_item("keywords", doc.keywords.to_object(py))?;
-            dict.set_item("structured_meta", doc.structured_meta.to_object(py))?;
             dict.set_item("headings", doc.headings.to_object(py))?;
             dict.set_item("primary_image", doc.primary_image.to_object(py))?;
             dict.set_item("favicon", doc.favicon.to_object(py))?;
@@ -142,8 +152,6 @@ fn internal_process_html(html_content: String, url: String) -> Result<ProcessedD
     // ⚡ CRITICAL: Remove unwanted tags BEFORE parsing to prevent CSS/script content from being extracted
     let cleaned_html = remove_unwanted_tags(&html_content);
     
-    // Parse the cleaned HTML using the ultra-fast tl parser
-    let _dom = tl::parse(&cleaned_html, tl::ParserOptions::default())?;
     
     // Initialize processors
     let extractor = OptimizedExtractor::new();
@@ -154,27 +162,10 @@ fn internal_process_html(html_content: String, url: String) -> Result<ProcessedD
     
     // ⚡ CLEAN ALL DATES using the FastCleaner for OpenSearch compatibility
     // Date fields are already normalized in the optimized extractor
-    
-    // Clean structured meta dates if present (simple structure now)
-    // No complex JSON cleaning needed since we only store essential fields
-    
-    // Ultra-fast language detection using Rust
-    if let Some(detected_lang) = FastLanguageDetector::detect_language(&cleaned_html, &url) {
-        doc.language = detected_lang;
-    }
-    
-    // Early filtering: skip non-English content for English-only search engine
-    if doc.language != "en" && !FastLanguageDetector::is_english(&doc.main_content, &url) {
-        // Return minimal document for non-English content
-        doc.main_content = String::new();
-        doc.text_chunks_with_context = Vec::new();
-        return Ok(doc);
-    }
-    
+     
     // Clean and process the text (only for English content)
     doc.main_content = cleaner.clean_text(&doc.main_content);
     doc.description = cleaner.clean_description(&doc.description);
-    
     // 🧹 CRITICAL: Clean ALL chunks using FastCleaner for proper noise removal
     for chunk in &mut doc.text_chunks_with_context {
         chunk.text_chunk = cleaner.clean_text(&chunk.text_chunk);
@@ -188,7 +179,6 @@ fn internal_process_html(html_content: String, url: String) -> Result<ProcessedD
     // Calculate content quality metrics
     doc.word_count = doc.main_content.split_whitespace().count();
     doc.content_quality_score = calculate_content_quality(&doc);
-    doc.is_technical_content = detect_technical_content(&doc.main_content);
     
     Ok(doc)
 }
@@ -229,27 +219,6 @@ fn calculate_content_quality(doc: &ProcessedDocument) -> f32 {
     score.min(10.0)
 }
 
-/// Detect if content is technical in nature
-fn detect_technical_content(text: &str) -> bool {
-    let technical_keywords = [
-        "api", "function", "class", "method", "property", "parameter",
-        "interface", "implementation", "algorithm", "data structure",
-        "programming", "code", "software", "technology", "technical"
-    ];
-    
-    let text_lower = text.to_lowercase();
-    let mut technical_count = 0;
-    
-    for keyword in &technical_keywords {
-        if text_lower.contains(keyword) {
-            technical_count += 1;
-        }
-    }
-    
-    // Consider technical if 3+ technical terms or high density
-    technical_count >= 3 || (technical_count as f32 / text.len() as f32) > 0.0001
-}
-
 /// Python module definition
 #[pymodule]
 fn rust_core_processor(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -259,3 +228,4 @@ fn rust_core_processor(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_language_info_fast, m)?)?;
     Ok(())
 }
+

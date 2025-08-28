@@ -8,14 +8,13 @@ pub struct ProcessedDocument {
     pub main_content: String,
     pub title: String,
     pub description: String,
-    pub language: String,
     pub keywords: Vec<String>,
     
     // Content structure - OPTIMIZED: Only primary image and essential headings
     pub headings: Vec<Heading>,
     pub primary_image: Option<ImageInfo>,  // Only the main/featured image
     pub favicon: Option<String>,           // Only favicon URL
-    
+    pub content_type: String,
     // Content analysis
     pub word_count: usize,
     pub content_quality_score: f32,
@@ -28,8 +27,7 @@ pub struct ProcessedDocument {
     pub modified_date: Option<String>,
     pub author_name: Option<String>,       // Simplified author info
     
-    // OPTIMIZED: Extracted essential structured data only
-    pub structured_meta: Option<StructuredMeta>,
+
     
     // Chunking with context
     pub text_chunks_with_context: Vec<ChunkWithContext>,
@@ -60,15 +58,6 @@ pub struct ChunkWithContext {
     pub chunk_index: usize,
 }
 
-// NEW: Essential structured data only
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StructuredMeta {
-    pub article_type: Option<String>,
-    pub featured_image: Option<String>,
-    pub date_published: Option<String>,
-    pub date_modified: Option<String>,
-    pub publisher_name: Option<String>,
-}
 
 // REMOVED: LinkInfo (not essential for search)
 // REMOVED: AuthorInfo (simplified to author_name string)
@@ -96,7 +85,7 @@ impl Default for ProcessedDocument {
             main_content: String::new(),
             title: String::new(),
             description: String::new(),
-            language: String::new(),
+            content_type: String::new(),
             keywords: Vec::new(),
             headings: Vec::new(),
             primary_image: None,
@@ -109,14 +98,12 @@ impl Default for ProcessedDocument {
             published_date: None,
             modified_date: None,
             author_name: None,
-            structured_meta: None,
             text_chunks_with_context: Vec::new(),
             semantic_info: SemanticInfo::default(),
         }
     }
 }
 
-// Removed old default implementations for deleted types
 
 impl Default for SemanticInfo {
     fn default() -> Self {
@@ -166,27 +153,6 @@ impl ToPyObject for ChunkWithContext {
     }
 }
 
-impl ToPyObject for StructuredMeta {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        let dict = pyo3::types::PyDict::new_bound(py);
-        if let Some(ref article_type) = self.article_type {
-            dict.set_item("article_type", article_type).unwrap();
-        }
-        if let Some(ref featured_image) = self.featured_image {
-            dict.set_item("featured_image", featured_image).unwrap();
-        }
-        if let Some(ref date_published) = self.date_published {
-            dict.set_item("date_published", date_published).unwrap();
-        }
-        if let Some(ref date_modified) = self.date_modified {
-            dict.set_item("date_modified", date_modified).unwrap();
-        }
-        if let Some(ref publisher_name) = self.publisher_name {
-            dict.set_item("publisher_name", publisher_name).unwrap();
-        }
-        dict.into()
-    }
-}
 
 impl ToPyObject for SemanticInfo {
     fn to_object(&self, py: Python<'_>) -> PyObject {

@@ -4,6 +4,9 @@ use regex::Regex;
 use chrono::{DateTime, NaiveDateTime, Utc, TimeZone, NaiveDate};
 use crate::types::*;
 use crate::cleaner::FastCleaner;
+use std::collections::HashSet;
+use crate::extractor::metadata_extractor::MetadataExtractor;
+use crate::extractor::main_content_extractor::MainContentExtractor;
 
 pub struct OptimizedExtractor {
     // Precompiled regex patterns for performance
@@ -101,18 +104,25 @@ impl OptimizedExtractor {
         let parser = dom.parser();
         
         let mut document = ProcessedDocument::default();
+        let metadata_extractor = MetadataExtractor::new(&dom, parser);
+        let main_content_extractor = MainContentExtractor;
         
-        // Extract essential metadata only
-        self.extract_essential_metadata(&dom, parser, &mut document, base_url);
-        
-        // Extract and clean main content
-        let raw_content = self.extract_main_content(&dom, parser);
-        document.main_content = self.annotate_technical_content(&raw_content);
-        
-        // Generate keywords from content if no meta keywords found
-        if document.keywords.is_empty() {
-            document.keywords = self.extract_keywords_from_content(&document.main_content, 10);
-        }
+        // Extract all metadata using the cached extractor
+        document.title = metadata_extractor.get_title().unwrap_or_default();
+        document.description = metadata_extractor.get_description().unwrap_or_default();
+        document.keywords = metadata_extractor.get_keywords();
+        document.content_type = metadata_extractor.get_content_type().unwrap_or_default();
+        document.primary_image = metadata_extractor.get_primary_image(|s| self.resolve_url(s, base_url));
+        document.favicon = metadata_extractor.get_favicon(|s| self.resolve_url(s, base_url));
+        document.author_name = metadata_extractor.get_author();
+        (document.published_date, document.modified_date) = 
+        metadata_extractor.get_dates(|s| self.parse_date_string(s));
+        document.canonical_url = metadata_extractor.get_canonical_url(base_url);
+        document.main_content = main_content_extractor.extract_main_content(&dom, parser);
+        document.content_categories = MetadataExtractor::get_content_categories(&document.main_content);
+
+        // Extract headings for content structure
+        self.extract_headings(&dom, parser, &mut document);
         
         // Create optimized chunks with context
         document.text_chunks_with_context = self.create_chunks_with_context(&document.main_content, &document.headings);
@@ -122,112 +132,13 @@ impl OptimizedExtractor {
         
         // Detect technical content
         document.is_technical_content = self.is_technical_content(&document);
+        if document.is_technical_content {
+            document.content_categories.push("technology".into())
+        }
         
         document
     }
 
-    fn extract_essential_metadata(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument, base_url: &str) {
-        // Extract title
-        if let Some(title_node) = dom.query_selector("title").and_then(|mut iter| iter.next()) {
-            if let Some(title_element) = title_node.get(parser) {
-                document.title = title_element.inner_text(parser).trim().to_string();
-            }
-        }
-        
-        // Extract language
-        if let Some(html_node) = dom.query_selector("html").and_then(|mut iter| iter.next()) {
-            if let Some(html_element) = html_node.get(parser) {
-                if let Some(HTMLTag { .. }) = html_element.as_tag() {
-                    let attrs = html_element.as_tag().unwrap().attributes();
-                    if let Some(lang) = attrs.get("lang").flatten() {
-                        document.language = lang.as_utf8_str().to_string();
-                    }
-                }
-            }
-        }
-        
-        // Extract essential meta tags only
-        self.extract_essential_meta_tags(dom, parser, document);
-        
-        // Extract essential structured data only
-        self.extract_essential_structured_data(dom, parser, document);
-        
-        // Extract headings for content structure
-        self.extract_headings(dom, parser, document);
-        
-        // Extract only primary image and favicon
-        self.extract_essential_images(dom, parser, document, base_url);
-        
-        // Extract simplified author information
-        self.extract_essential_author_info(dom, parser, document);
-        
-        // Extract publication dates
-        self.extract_publication_dates(dom, parser, document);
-        
-        // Only extract canonical URL if different from base URL
-        self.extract_canonical_url_if_different(dom, parser, document, base_url);
-    }
-
-    fn extract_essential_meta_tags(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument) {
-        if let Some(meta_nodes) = dom.query_selector("meta") {
-            for node_handle in meta_nodes {
-                if let Some(node) = node_handle.get(parser) {
-                    if let Some(tag) = node.as_tag() {
-                        let attrs = tag.attributes();
-                        
-                        // Only extract essential meta tags
-                        if let (Some(name), Some(content)) = (attrs.get("name").flatten(), attrs.get("content").flatten()) {
-                            let name_str = name.as_utf8_str().to_lowercase();
-                            let content_str = content.as_utf8_str().to_string();
-                            
-                            match name_str.as_str() {
-                                "description" => document.description = content_str,
-                                "keywords" => {
-                                    document.keywords = content_str
-                                        .split(',')
-                                        .map(|k| k.trim().to_string())
-                                        .filter(|k| !k.is_empty() && k.len() >= 3)
-                                        .take(10) // Limit to 10 keywords
-                                        .collect();
-                                }
-                                "author" => document.author_name = Some(content_str),
-                                _ => {} // Ignore other meta tags
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn extract_essential_structured_data(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument) {
-        let mut structured_meta = StructuredMeta {
-            article_type: None,
-            featured_image: None,
-            date_published: None,
-            date_modified: None,
-            publisher_name: None,
-        };
-
-        // Extract only essential data from JSON-LD
-        if let Some(script_nodes) = dom.query_selector("script[type*='ld+json'], script[type*='application/ld+json']") {
-            for node_handle in script_nodes {
-                if let Some(node) = node_handle.get(parser) {
-                    let script_content = node.inner_text(parser);
-                    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&script_content) {
-                        self.extract_essential_from_json_ld(&json_value, &mut structured_meta);
-                    }
-                }
-            }
-        }
-
-        // Only store if we found useful data
-        if structured_meta.article_type.is_some() || 
-           structured_meta.featured_image.is_some() || 
-           structured_meta.publisher_name.is_some() {
-            document.structured_meta = Some(structured_meta);
-        }
-    }
 
     fn extract_headings(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument) {
         for level in 1..=6 {
@@ -249,252 +160,8 @@ impl OptimizedExtractor {
         }
     }
 
-    fn extract_essential_images(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument, base_url: &str) {
-        // Look for primary/featured image first (og:image)
-        if let Some(og_image) = dom.query_selector("meta[property='og:image']").and_then(|mut iter| iter.next()) {
-            if let Some(node) = og_image.get(parser) {
-                if let Some(tag) = node.as_tag() {
-                    if let Some(content) = tag.attributes().get("content").flatten() {
-                        let src = content.as_utf8_str().to_string();
-                        document.primary_image = Some(ImageInfo {
-                            src: self.resolve_url(&src, base_url),
-                            alt: "Featured image".to_string(),
-                        });
-                    }
-                }
-            }
-        }
-
-        // If no og:image, look for the first meaningful img tag
-        if document.primary_image.is_none() {
-            if let Some(img_nodes) = dom.query_selector("img[src]") {
-                for node_handle in img_nodes {
-                    if let Some(node) = node_handle.get(parser) {
-                        if let Some(tag) = node.as_tag() {
-                            let attrs = tag.attributes();
-                            if let Some(src) = attrs.get("src").flatten() {
-                                let src_str = src.as_utf8_str();
-                                // Skip small icons and decorative images
-                                if !src_str.contains("icon") && !src_str.contains("logo") && !src_str.contains("favicon") {
-                                    let alt = attrs.get("alt").flatten()
-                                        .map(|a| a.as_utf8_str().to_string())
-                                        .unwrap_or_default();
-                                    
-                                    document.primary_image = Some(ImageInfo {
-                                        src: self.resolve_url(&src_str, base_url),
-                                        alt,
-                                    });
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Extract favicon only
-        if let Some(favicon_node) = dom.query_selector("link[rel*='icon']").and_then(|mut iter| iter.next()) {
-            if let Some(node) = favicon_node.get(parser) {
-                if let Some(tag) = node.as_tag() {
-                    if let Some(href) = tag.attributes().get("href").flatten() {
-                        document.favicon = Some(self.resolve_url(&href.as_utf8_str(), base_url));
-                    }
-                }
-            }
-        }
-    }
-
-    fn extract_essential_author_info(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument) {
-        // Only extract author name, not full bio/social links
-        if document.author_name.is_none() {
-            let author_selectors = [
-                ".author-name", ".author", "[data-author]", ".byline .name"
-            ];
-            
-            for selector in &author_selectors {
-                if let Some(author_node) = dom.query_selector(selector).and_then(|mut iter| iter.next()) {
-                    if let Some(node) = author_node.get(parser) {
-                        let author_text = node.inner_text(parser).trim().to_string();
-                        if !author_text.is_empty() && author_text.len() < 100 {
-                            document.author_name = Some(author_text);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn extract_publication_dates(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument) {
-        // Check meta tags first (essential patterns only)
-        let pub_date_keys = [
-            "article:published_time", "datePublished", "date"
-        ];
-        
-        for key in &pub_date_keys {
-            if let Some(meta_node) = dom.query_selector(&format!("meta[property='{}'], meta[name='{}']", key, key))
-                .and_then(|mut iter| iter.next()) {
-                if let Some(node) = meta_node.get(parser) {
-                    if let Some(tag) = node.as_tag() {
-                        let attrs = tag.attributes();
-                        if let Some(content) = attrs.get("content").flatten() {
-                            if let Some(normalized) = self.parse_date_string(&content.as_utf8_str()) {
-                                document.published_date = Some(normalized);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        let mod_date_keys = [
-            "article:modified_time", "dateModified", "lastmod"
-        ];
-        
-        for key in &mod_date_keys {
-            if let Some(meta_node) = dom.query_selector(&format!("meta[property='{}'], meta[name='{}']", key, key))
-                .and_then(|mut iter| iter.next()) {
-                if let Some(node) = meta_node.get(parser) {
-                    if let Some(tag) = node.as_tag() {
-                        let attrs = tag.attributes();
-                        if let Some(content) = attrs.get("content").flatten() {
-                            if let Some(normalized) = self.parse_date_string(&content.as_utf8_str()) {
-                                document.modified_date = Some(normalized);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Check time elements
-        if let Some(time_nodes) = dom.query_selector("time") {
-            for node_handle in time_nodes {
-                if let Some(node) = node_handle.get(parser) {
-                    if let Some(tag) = node.as_tag() {
-                        let attrs = tag.attributes();
-                        if let Some(datetime) = attrs.get("datetime").flatten() {
-                            if let Some(normalized) = self.parse_date_string(&datetime.as_utf8_str()) {
-                                if document.published_date.is_none() {
-                                    document.published_date = Some(normalized);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn extract_canonical_url_if_different(&self, dom: &tl::VDom, parser: &Parser, document: &mut ProcessedDocument, base_url: &str) {
-        if let Some(canonical_node) = dom.query_selector("link[rel='canonical']").and_then(|mut iter| iter.next()) {
-            if let Some(node) = canonical_node.get(parser) {
-                if let Some(tag) = node.as_tag() {
-                    if let Some(href) = tag.attributes().get("href").flatten() {
-                        let canonical_url = href.as_utf8_str().to_string();
-                        // Only store if different from base URL
-                        if canonical_url != base_url {
-                            document.canonical_url = Some(canonical_url);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn extract_main_content(&self, dom: &tl::VDom, parser: &Parser) -> String {
-        // Priority selectors for main content (expanded list)
-        let content_selectors = [
-            "main", "article", ".content", ".post-content", ".entry-content",
-            "#content", ".article-body", ".post-body", ".article-text",
-            "[role='main']", ".main-content", ".page-content", ".content-wrapper",
-            ".story-content", ".article-wrapper", ".text-content"
-        ];
-        
-        // Try priority selectors first
-        for selector in &content_selectors {
-            if let Some(content_node) = dom.query_selector(selector).and_then(|mut iter| iter.next()) {
-                if let Some(node) = content_node.get(parser) {
-                    let content = self.extract_clean_text_from_node(node, parser);
-                    if content.trim().len() > 100 {
-                        return self.clean_body_text(&content);
-                    }
-                }
-            }
-        }
-        
-        // Enhanced fallback: extract text but filter out script/style/nav content
-        if let Some(body_node) = dom.query_selector("body").and_then(|mut iter| iter.next()) {
-            if let Some(node) = body_node.get(parser) {
-                let raw_content = self.extract_clean_text_from_node(node, parser);
-                return self.extract_readable_content(&raw_content);
-            }
-        }
-        
-        String::new()
-    }
     
-    /// Extract text from a node while filtering out script, style, and other noise elements
-    fn extract_clean_text_from_node(&self, node: &Node, parser: &Parser) -> String {
-        let mut clean_text = String::new();
-        
-        match node {
-            Node::Tag(tag) => {
-                let tag_name = tag.name().as_utf8_str().to_lowercase();
-                
-                // Skip script, style, noscript, and other noise elements
-                if matches!(tag_name.as_str(), 
-                    "script" | "style" | "noscript" | "nav" | "header" | "footer" | 
-                    "aside" | "menu" | "menuitem" | "figure" | "figcaption" |
-                    "button" | "input" | "select" | "textarea" | "form"
-                ) {
-                    return String::new();
-                }
-                
-                // Skip elements with noise classes/IDs
-                let attrs = tag.attributes();
-                if let Some(class_val) = attrs.get("class").flatten() {
-                    let class_str = class_val.as_utf8_str().to_lowercase();
-                    if class_str.contains("nav") || class_str.contains("menu") || 
-                       class_str.contains("sidebar") || class_str.contains("footer") ||
-                       class_str.contains("header") || class_str.contains("ad") ||
-                       class_str.contains("mw-parser-output") || class_str.contains("navbox") ||
-                       class_str.contains("hlist") || class_str.contains("infobox") {
-                        return String::new();
-                    }
-                }
-                
-                if let Some(id_val) = attrs.get("id").flatten() {
-                    let id_str = id_val.as_utf8_str().to_lowercase();
-                    if id_str.contains("nav") || id_str.contains("menu") || 
-                       id_str.contains("sidebar") || id_str.contains("footer") ||
-                       id_str.contains("header") || id_str.contains("ad") {
-                        return String::new();
-                    }
-                }
-                
-                // Recursively extract text from child nodes
-                for child in tag.children().top().iter() {
-                    if let Some(child_node) = child.get(parser) {
-                        clean_text.push_str(&self.extract_clean_text_from_node(child_node, parser));
-                        clean_text.push(' ');
-                    }
-                }
-            }
-            Node::Raw(text) => {
-                clean_text.push_str(&text.as_utf8_str());
-            }
-            _ => {}
-        }
-        
-        clean_text
-    }
-
-    fn create_chunks_with_context(&self, content: &str, headings: &[Heading]) -> Vec<ChunkWithContext> {
+fn create_chunks_with_context(&self, content: &str, headings: &[Heading]) -> Vec<ChunkWithContext> {
         if content.is_empty() {
             return Vec::new();
         }
@@ -700,52 +367,6 @@ impl OptimizedExtractor {
             .collect()
     }
 
-    fn extract_essential_from_json_ld(&self, json_value: &serde_json::Value, structured_meta: &mut StructuredMeta) {
-        if let Some(obj) = json_value.as_object() {
-            // Extract article type
-            if let Some(type_val) = obj.get("@type") {
-                if let Some(type_str) = type_val.as_str() {
-                    structured_meta.article_type = Some(type_str.to_string());
-                }
-            }
-
-            // Extract featured image
-            if let Some(image_val) = obj.get("image") {
-                let image_url = match image_val {
-                    serde_json::Value::String(s) => Some(s.clone()),
-                    serde_json::Value::Object(img_obj) => {
-                        img_obj.get("url").and_then(|u| u.as_str()).map(|s| s.to_string())
-                    }
-                    _ => None
-                };
-                if let Some(url) = image_url {
-                    structured_meta.featured_image = Some(url);
-                }
-            }
-
-            // Extract publisher name
-            if let Some(publisher_val) = obj.get("publisher") {
-                let publisher_name = match publisher_val {
-                    serde_json::Value::String(s) => Some(s.clone()),
-                    serde_json::Value::Object(pub_obj) => {
-                        pub_obj.get("name").and_then(|n| n.as_str()).map(|s| s.to_string())
-                    }
-                    _ => None
-                };
-                if let Some(name) = publisher_name {
-                    structured_meta.publisher_name = Some(name);
-                }
-            }
-
-            // Extract dates
-            if let Some(date_pub) = obj.get("datePublished").and_then(|d| d.as_str()) {
-                structured_meta.date_published = Some(date_pub.to_string());
-            }
-            if let Some(date_mod) = obj.get("dateModified").and_then(|d| d.as_str()) {
-                structured_meta.date_modified = Some(date_mod.to_string());
-            }
-        }
-    }
 
     fn resolve_url(&self, url: &str, base_url: &str) -> String {
         if url.starts_with("http") {
@@ -835,11 +456,7 @@ impl OptimizedExtractor {
         self.clean_body_text(&filtered_content)
     }
 
-    fn annotate_technical_content(&self, content: &str) -> String {
-        // Simple annotation for technical content
-        content.to_string()
-    }
-
+ 
     fn calculate_essential_metrics(&self, document: &mut ProcessedDocument) {
         let words: Vec<&str> = document.main_content
             .split_whitespace()
@@ -900,27 +517,7 @@ impl OptimizedExtractor {
         document.semantic_info.is_technical_content
     }
 
-    fn extract_keywords_from_content(&self, content: &str, max_keywords: usize) -> Vec<String> {
-        let content_lower = content.to_lowercase();
-        let words: Vec<&str> = content_lower
-            .split_whitespace()
-            .filter(|w| w.len() > 3 && !w.chars().all(|c| !c.is_alphabetic()))
-            .collect();
-
-        let mut word_counts = std::collections::HashMap::new();
-        for word in words {
-            *word_counts.entry(word.to_string()).or_insert(0) += 1;
-        }
-
-        let mut sorted_words: Vec<_> = word_counts.into_iter().collect();
-        sorted_words.sort_by(|a, b| b.1.cmp(&a.1));
-
-        sorted_words
-            .into_iter()
-            .take(max_keywords)
-            .map(|(word, _)| word)
-            .collect()
-    }
+    
 
     fn parse_date_string(&self, date_str: &str) -> Option<String> {
         // Simple date parsing - use chrono for proper parsing
