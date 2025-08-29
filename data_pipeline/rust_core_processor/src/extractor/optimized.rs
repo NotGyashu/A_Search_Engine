@@ -111,12 +111,12 @@ impl OptimizedExtractor {
         document.title = metadata_extractor.get_title().unwrap_or_default();
         document.description = metadata_extractor.get_description().unwrap_or_default();
         document.keywords = metadata_extractor.get_keywords();
-        document.content_type = metadata_extractor.get_content_type().unwrap_or_default();
+        document.content_type = metadata_extractor.get_content_type(base_url);
         document.primary_image = metadata_extractor.get_primary_image(|s| self.resolve_url(s, base_url));
         document.favicon = metadata_extractor.get_favicon(|s| self.resolve_url(s, base_url));
         document.author_name = metadata_extractor.get_author();
         (document.published_date, document.modified_date) = 
-        metadata_extractor.get_dates(|s| self.parse_date_string(s));
+        metadata_extractor.get_dates();
         document.canonical_url = metadata_extractor.get_canonical_url(base_url);
         document.main_content = main_content_extractor.extract_main_content(&dom, parser);
         document.content_categories = MetadataExtractor::get_content_categories(&document.main_content);
@@ -481,6 +481,7 @@ fn create_chunks_with_context(&self, content: &str, headings: &[Heading]) -> Vec
                 document.word_count as f32 / document.semantic_info.sentence_count as f32
             } else { 0.0 },
             content_density: document.word_count as f32 / document.main_content.len().max(1) as f32,
+            domain_score: 0.0, // Default or update as needed
         };
         
         document.content_quality_score = document.semantic_info.content_quality_score;
@@ -519,20 +520,5 @@ fn create_chunks_with_context(&self, content: &str, headings: &[Heading]) -> Vec
 
     
 
-    fn parse_date_string(&self, date_str: &str) -> Option<String> {
-        // Simple date parsing - use chrono for proper parsing
-        if let Ok(dt) = DateTime::parse_from_rfc3339(date_str) {
-            return Some(dt.to_utc().to_rfc3339());
-        }
-        
-        // Try other common formats
-        for pattern in &self.date_patterns {
-            if pattern.is_match(date_str) {
-                // For now, return the original string if it matches a pattern
-                return Some(date_str.to_string());
-            }
-        }
-        
-        None
-    }
+    
 }

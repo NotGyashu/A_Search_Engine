@@ -8,11 +8,13 @@ mod extractor;
 mod cleaner;
 mod types;
 mod language_detector;
+mod scorer;
 
 use extractor::OptimizedExtractor;
 use cleaner::FastCleaner;
 use types::ProcessedDocument;
 use language_detector::FastLanguageDetector;
+use scorer::ContentScorer; 
 
 // Global regex patterns compiled once
 static WHITESPACE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
@@ -23,25 +25,7 @@ static URL_REGEX: Lazy<Regex> = Lazy::new(|| {
 fn remove_unwanted_tags(html: &str) -> String {
     let mut cleaned = html.to_string();
 
-    // Remove script tags BUT preserve JSON-LD (using closure approach)
-    static SCRIPT_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"(?is)<script([^>]*)>(.*?)</script>").unwrap()
-    });
     
-    cleaned = SCRIPT_TAG_REGEX.replace_all(&cleaned, |caps: &regex::Captures| {
-        let attributes = caps.get(1).map_or("", |m| m.as_str()).to_lowercase();
-        
-        // Check if this is a JSON-LD script (case insensitive)
-        if attributes.contains("application/ld+json") || 
-           attributes.contains("ld+json") {
-            // Preserve the entire JSON-LD script tag
-            caps[0].to_string()
-        } else {
-            // Remove non-JSON-LD scripts
-            String::new()
-        }
-    }).to_string();
-
     // Remove style tags
     static STYLE_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
         Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap()
@@ -119,6 +103,7 @@ fn process_html(html_content: String, url: String) -> PyResult<PyObject> {
             dict.set_item("title", &doc.title)?;
             dict.set_item("description", &doc.description)?;
             dict.set_item("content_categories", &doc.content_categories)?;
+            dict.set_item("content_type", &doc.content_type)?;
             dict.set_item("keywords", doc.keywords.to_object(py))?;
             dict.set_item("headings", doc.headings.to_object(py))?;
             dict.set_item("primary_image", doc.primary_image.to_object(py))?;
@@ -149,20 +134,22 @@ fn process_html(html_content: String, url: String) -> PyResult<PyObject> {
 
 /// Internal processing function that does the actual work
 fn internal_process_html(html_content: String, url: String) -> Result<ProcessedDocument, Box<dyn std::error::Error>> {
-    // ⚡ CRITICAL: Remove unwanted tags BEFORE parsing to prevent CSS/script content from being extracted
+    //Remove unwanted tags BEFORE parsing to prevent CSS/script content from being extracted
     let cleaned_html = remove_unwanted_tags(&html_content);
     
     
     // Initialize processors
     let extractor = OptimizedExtractor::new();
     let cleaner = FastCleaner::new();
+    let scorer = ContentScorer::new(); 
     
     // Extract all content from the cleaned HTML in one pass
     let mut doc = extractor.extract_content(&cleaned_html, &url);
     
     // ⚡ CLEAN ALL DATES using the FastCleaner for OpenSearch compatibility
-    // Date fields are already normalized in the optimized extractor
-     
+    doc.published_date = cleaner.normalize_date(doc.published_date.as_deref().unwrap_or(""));
+    doc.modified_date = cleaner.normalize_date(doc.modified_date.as_deref().unwrap_or(""));
+    
     // Clean and process the text (only for English content)
     doc.main_content = cleaner.clean_text(&doc.main_content);
     doc.description = cleaner.clean_description(&doc.description);
@@ -176,48 +163,17 @@ fn internal_process_html(html_content: String, url: String) -> Result<ProcessedD
         !chunk.text_chunk.is_empty() && chunk.text_chunk.len() >= 25  // Reduced from 50 to 25
     });
     
+    let final_quality_score = scorer.calculate_content_quality_score(&doc);
+    let domain_score = scorer.calculate_domain_score(&url);
     // Calculate content quality metrics
     doc.word_count = doc.main_content.split_whitespace().count();
-    doc.content_quality_score = calculate_content_quality(&doc);
+    doc.content_quality_score = final_quality_score;
+    doc.semantic_info.content_quality_score = final_quality_score;
+    doc.semantic_info.domain_score = domain_score;
     
     Ok(doc)
 }
 
-/// Calculate content quality score
-fn calculate_content_quality(doc: &ProcessedDocument) -> f32 {
-    let mut score = 0.0;
-    
-    // Length scoring
-    let word_count = doc.word_count as f32;
-    if word_count > 100.0 {
-        score += (word_count / 1000.0).min(3.0);
-    }
-    
-    // Structure scoring
-    if !doc.headings.is_empty() {
-        score += 1.0;
-    }
-    
-    if doc.headings.len() > 2 {
-        score += 0.5;
-    }
-    
-    // Content diversity
-    if doc.primary_image.is_some() {
-        score += 0.5;
-    }
-    
-    if !doc.description.is_empty() && doc.description.len() > 50 {
-        score += 1.0;
-    }
-    
-    // Technical content bonus
-    if doc.is_technical_content {
-        score += 0.5;
-    }
-    
-    score.min(10.0)
-}
 
 /// Python module definition
 #[pymodule]

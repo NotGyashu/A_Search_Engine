@@ -22,14 +22,12 @@ __author__ = "AI Search Team"
 
 from .extractor import ContentExtractor
 from .cleaner import ContentCleaner
-from .scorer import ContentScorer
 from .processor import DocumentProcessor
 from .file_reader import FileReader
 
 __all__ = [
     "ContentExtractor",
-    "ContentCleaner", 
-    "ContentScorer",
+    "ContentCleaner",
     "DocumentProcessor",
     "FileReader"
 ]

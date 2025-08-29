@@ -20,7 +20,6 @@ import os
 
 from hybrid_processor import HybridDocumentProcessor
 from file_reader import FileReader
-from scorer import ContentScorer
 from config import PipelineConfig
 
 # Configure logging with better configuration
@@ -54,7 +53,6 @@ def process_document_worker(doc_data: Dict[str, Any]) -> Optional[Dict[str, Any]
     try:
         # Initialize processor in each worker process
         processor = HybridDocumentProcessor()
-        scorer = ContentScorer()
         
         # Extract required fields
         html_content = doc_data.get('content', '')
@@ -72,18 +70,6 @@ def process_document_worker(doc_data: Dict[str, Any]) -> Optional[Dict[str, Any]
             logger.warning(f"Failed to process document: {url}")
             return None
         
-        # Score document
-        try:
-            score = scorer.calculate_content_quality_score(
-                document.content if hasattr(document, 'content') else '',
-                asdict(document),
-                {}  # content_metrics
-            )
-            # Add score to document
-            if hasattr(document, '__dict__'):
-                document.__dict__['score'] = score
-        except Exception as e:
-            logger.warning(f"Failed to score document {url}: {e}")
         
         # Convert to serializable format
         result = {
@@ -131,7 +117,6 @@ class ProductionPipeline:
         
         # Initialize processor and scorer
         self.processor = HybridDocumentProcessor()
-        self.scorer = ContentScorer() if score_documents else None
         
         self.stats = {
             'processed': 0,
@@ -168,19 +153,6 @@ class ProductionPipeline:
                 logger.warning(f"Failed to process document: {url}")
                 return None
             
-            # Score document
-            if self.scorer:
-                try:
-                    score = self.scorer.calculate_content_quality_score(
-                        document.content if hasattr(document, 'content') else '',
-                        asdict(document),
-                        {}  # content_metrics
-                    )
-                    # Add score to document
-                    if hasattr(document, '__dict__'):
-                        document.__dict__['score'] = score
-                except Exception as e:
-                    logger.warning(f"Failed to score document {url}: {e}")
             
             # Convert to serializable format
             result = {

@@ -15,6 +15,11 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
+import re
+from collections import defaultdict
+import heapq
+
+
 
 # Import the ultra-fast Rust core processor
 try:
@@ -26,7 +31,6 @@ except ImportError as e:
     print("Falling back to Python-only processing...")
     RUST_AVAILABLE = False
 
-from scorer import ContentScorer
 
 # Set logging to WARNING to reduce verbosity
 logging.basicConfig(level=logging.WARNING)
@@ -80,7 +84,45 @@ class DocumentChunk:
 
 class HybridDocumentProcessor:
     """High-performance hybrid Rust/Python document processor."""
-    
+    _TOKENIZER = re.compile(r"\b\w+\b").findall  # precompiled regex
+
+    # precomputed stopwords set (same as yours, just defined once)
+    _STOPWORDS = {
+        "a","an","the","and","or","but","if","then","else","when","while","because",
+        "as","until","since","than","though","although","unless","once","where","whereas",
+        "at","from","by","with","for","to","into","onto","upon","about","of","in","on",
+        "off","over","under","out","up","down","near","away","across","through","after",
+        "before","between","among","during","without","within","against","along","per",
+        "i","me","my","myself","we","our","ours","ourselves","you","your","yours",
+        "yourself","yourselves","he","him","his","himself","she","her","hers","herself",
+        "it","its","itself","they","them","their","theirs","themselves","one","ones",
+        "anyone","everyone","someone","nobody","everybody","somebody",
+        "is","am","are","was","were","be","been","being","have","has","had","having",
+        "do","does","did","doing","can","cannot","could","should","would","will","shall",
+        "must","may","might","ought",
+        "i'm","you're","he's","she's","it's","we're","they're","i've","you've","we've",
+        "they've","i'd","you'd","he'd","she'd","we'd","they'd","i'll","you'll","he'll",
+        "she'll","we'll","they'll","isn't","aren't","wasn't","weren't","hasn't","haven't",
+        "hadn't","doesn't","don't","didn't","won't","wouldn't","shan't","shouldn't","can't",
+        "couldn't","mustn't","let's","that's","who's","what's","here's","there's","when's",
+        "where's","why's","how's",
+        "yes","no","not","nor","so","too","very","also","just","only","same","own","each",
+        "few","more","most","some","any","all","other","another","many","much","both",
+        "such","yet","ever","never","always","sometimes","often","rarely","hardly",
+        "home","page","pages","article","post","blog","entry","story","news","update",
+        "archive","category","categories","tag","tags","topic","topics","section","sections",
+        "content","feature","features","search","query","results","index","feed","rss",
+        "comment","comments","reply","replies","share","shares","like","likes","view","views",
+        "read","reading","click","clicked","submit","posted","updated",
+        "menu","navigation","nav","header","footer","sidebar","widget","login","logout",
+        "signup","register","profile","account","settings","contact","about","help","support",
+        "privacy","terms","policy","cookie","copyright",
+        "html","htm","php","asp","aspx","jsp","cfm","cgi","www","com","net","org","info",
+        "index","main","default",
+        "day","days","week","weeks","month","months","year","years","today","yesterday","tomorrow",
+        "monday","tuesday","wednesday","thursday","friday","saturday","sunday"
+    }
+
     def __init__(self):
         """Initialize the Rust-powered document processor."""
         if not RUST_AVAILABLE:
@@ -89,19 +131,6 @@ class HybridDocumentProcessor:
         # Use Rust for ultra-fast processing (log only on debug level)
         logger.debug("Using hybrid Rust/Python processing (ultra-fast)")
         
-        # Initialize Python components for enhancement
-        self.scorer = ContentScorer()
-        # Note: language_detector is now handled by Rust for maximum performance
-        
-        # Performance tracking
-        self.processing_stats = {
-            'total_processed': 0,
-            'total_time': 0.0,
-            'rust_time': 0.0,
-            'python_time': 0.0,
-            'average_time_per_doc': 0.0
-        }
-
     def process_document(self, html_content: str, url: str, domain: str = None) -> tuple[Document, List[DocumentChunk]]:
         return self._process_with_rust(html_content, url, domain)
         
@@ -113,35 +142,22 @@ class HybridDocumentProcessor:
         if not is_english_fast(html_content[:2000], url):  # Check first 2K chars for speed
             logger.info(f"Filtering out non-English page: {url}")
             return None, []  # Skip non-English pages entirely
-
-        rust_start = time.time()
         
         # Call the Rust core processor - now includes ultra-fast language detection
         rust_result = process_html(html_content, url)
         
-        rust_time = time.time() - rust_start
-        self.processing_stats['rust_time'] += rust_time
         
         if 'error' in rust_result:
             logger.error(f"Rust processing failed for {url}: {rust_result['error']}")
             # Return empty result if Rust processing fails
             return None, []
         
-        python_start = time.time()
 
         # Create document from Rust results
         document = self._create_document_from_rust_result(rust_result, url, domain)
         
         # Create chunks from the already-processed text
         chunks = self._create_chunks_from_rust_result(rust_result, document.document_id)
-        
-        # Python-based scoring and enhancement (language detection now in Rust)
-        document = self._enhance_document_with_python(document, rust_result)
-        
-        python_time = time.time() - python_start
-        self.processing_stats['python_time'] += python_time
-        
-        logger.debug(f"Rust processing: {rust_time:.3f}s, Python enhancement: {python_time:.3f}s")
         
         return document, chunks
 
@@ -160,22 +176,27 @@ class HybridDocumentProcessor:
         title = rust_result.get('title', '')
         description = rust_result.get('description', '')
         
-        categories = rust_result.get('content_categories', '')
-        
         # OPTIMIZED: Only store canonical URL if different from URL
         canonical_url = rust_result.get('canonical_url')
         if canonical_url == url:
             canonical_url = None
-        
+
+        keywords = rust_result.get('keywords', [])
+        if not keywords:  # catches empty list or empty string
+            keywords = self.extract_keywords(rust_result.get('main_content', ''), 10)
+        else:
+            keywords = keywords[:10]  # limit only if keywords came from Rust
+
+
         return Document(
             document_id=document_id,
             url=url,
             title=rust_result.get('title', ''),
             domain=domain,
             description=rust_result.get('description', ''),
-            content_type=self._determine_content_type(url, rust_result),
-            categories=categories,
-            keywords=rust_result.get('keywords', [])[:10],  # Limit to 10 keywords
+            content_type=rust_result.get('content_type', ''),
+            categories=rust_result.get('content_categories', ''),
+            keywords=keywords,
             canonical_url=canonical_url,
             published_date=rust_result.get('published_date'),
             modified_date=rust_result.get('modified_date'),
@@ -186,7 +207,7 @@ class HybridDocumentProcessor:
                 'word_count': rust_result.get('word_count', 0),
                 'content_quality_score': rust_result.get('content_quality_score', 0.0),
                 'is_technical_content': rust_result.get('is_technical_content', False),
-                'domain_score': self.scorer.calculate_domain_score(url)
+                'domain_score': rust_result.get('domain_score', 0.0)
             }
         )
 
@@ -213,50 +234,6 @@ class HybridDocumentProcessor:
         return chunks
         
 
-    def _enhance_document_with_python(self, document: Document, rust_result: Dict) -> Document:
-        """Enhance the document with Python-based analysis."""
-        try:
-            # Content scoring and categorization
-            score_result = self.scorer.calculate_content_quality_score(
-                content=rust_result.get('main_content', ''),
-                metadata={
-                    'title': document.title,
-                    'description': document.description,
-                    'url': document.url
-                },
-                content_metrics={
-                    'word_count': rust_result.get('word_count', 0)
-                }
-            )
-            
-            # Update semantic info with quality score
-            if document.semantic_info:
-                document.semantic_info.update({
-                    'content_quality_score': score_result if isinstance(score_result, (int, float)) else 0.0,
-                    'domain_score': self.scorer.calculate_domain_score(document.url)
-                })
-            
-        except Exception as e:
-            logger.warning(f"Error in Python enhancement: {e}")
-        
-        return document
-
-    def _determine_content_type(self, url: str, rust_result: Dict) -> str:
-        """Determine content type from URL and metadata."""
-        if(rust_result.get('content_type')):
-            return rust_result.get('content_type')
-
-        content_type = "article"  # default
-        
-        description = rust_result.get('description', '').lower()
-        
-        # Check for blog indicators
-        if (any(indicator in url.lower() for indicator in ['blog', 'news', 'post']) or
-            any(indicator in description for indicator in ['blog', 'post', 'article'])):
-            content_type = "blog"
-        
-        return content_type
-
     def _create_chunks_from_content(self, text_chunks: List[str], document_id: str) -> List[DocumentChunk]:
         """Create chunks from text content (fallback method)."""
         chunks = []
@@ -272,3 +249,36 @@ class HybridDocumentProcessor:
             chunks.append(chunk)
         return chunks
 
+    @staticmethod
+    def extract_keywords(text: str, top_n: int = 10):
+        """
+        Super-fast RAKE-inspired keyword extractor.
+        Optimized to minimize CPU/memory overhead.
+        """
+        words = HybridDocumentProcessor._TOKENIZER(text.lower())
+        stopwords = HybridDocumentProcessor._STOPWORDS
+        freq, degree = defaultdict(int), defaultdict(int)
+
+        current_phrase = []
+        for word in words:
+            if word in stopwords:
+                if current_phrase:
+                    d = len(current_phrase) - 1
+                    for w in current_phrase:
+                        freq[w] += 1
+                        degree[w] += d
+                    current_phrase = []
+            else:
+                current_phrase.append(word)
+
+        if current_phrase:  # flush last phrase
+            d = len(current_phrase) - 1
+            for w in current_phrase:
+                freq[w] += 1
+                degree[w] += d
+
+        # compute score
+        scores = {w: (degree[w] + freq[w]) / freq[w] for w in freq if len(w) > 2}
+
+        # top_n keywords using heapq (faster than full sort for small n)
+        return [w for w, _ in heapq.nlargest(top_n, scores.items(), key=lambda x: x[1])]

@@ -77,6 +77,7 @@ pub struct SemanticInfo {
     pub technical_score: f32,
     pub avg_sentence_length: f32,
     pub content_density: f32,
+    pub domain_score: f32,
 }
 
 impl Default for ProcessedDocument {
@@ -120,6 +121,7 @@ impl Default for SemanticInfo {
             technical_score: 0.0,
             avg_sentence_length: 0.0,
             content_density: 0.0,
+            domain_score: 0.0,
         }
     }
 }
@@ -169,6 +171,7 @@ impl ToPyObject for SemanticInfo {
         dict.set_item("technical_score", self.technical_score).unwrap();
         dict.set_item("avg_sentence_length", self.avg_sentence_length).unwrap();
         dict.set_item("content_density", self.content_density).unwrap();
+        dict.set_item("domain_score", self.domain_score).unwrap(); 
         dict.into()
     }
 }
