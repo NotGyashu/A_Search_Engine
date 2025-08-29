@@ -317,12 +317,10 @@ class OpenSearchIndexer:
                 "canonical_url": {"type": "keyword"},
                 "published_date": {"type": "date", "format": "strict_date_optional_time||epoch_millis"},
                 "modified_date": {"type": "date", "format": "strict_date_optional_time||epoch_millis"},
-                "author_info": {"type": "object"},
-                "structured_data": {"type": "object"},
-                "images": {"type": "nested"},
-                "table_of_contents": {"type": "nested"},
-                "semantic_info": {"type": "object"},
-                "icons": {"type": "object"},
+                "author_info": {"type": "object","enabled": False},
+                "images": {"type": "nested","enabled": False},
+                "semantic_info": {"type": "object","enabled": False},
+                "icons": {"type": "object","enabled": False},
                 "indexed_at": {"type": "date"},
                 "@timestamp": {"type": "date"}
             }
@@ -335,11 +333,7 @@ class OpenSearchIndexer:
                 "document_id": {"type": "keyword"},
                 "text_chunk": {"type": "text", "analyzer": "standard"},
                 "headings": {"type": "text"},
-                "domain_score": {"type": "float"},
-                "quality_score": {"type": "float"},
                 "word_count": {"type": "integer"},
-                "content_categories": {"type": "keyword"},
-                "keywords": {"type": "keyword"},
                 "indexed_at": {"type": "date"},
                 "@timestamp": {"type": "date"}
             }
@@ -613,21 +607,19 @@ class OpenSearchIndexer:
                 items_added = self._process_jsonl_file(file_path, is_fresh=True)
                 
                 if items_added > 0:
-                    # Move to processed directory
                     self._move_file(file_path, config.PROCESSED_DIR)
                     self.stats.files_processed += 1
                     self.stats.fresh_files_processed += 1
                     processed_count += 1
                     self.logger.info(f"Processed fresh file: {file_path} ({items_added} items)")
                 else:
-                    # Move to failed directory
-                    self._move_file(file_path, config.FAILED_DIR)
+                    self._move_file(file_path, config.BACKLOG_DIR)
                     self.stats.files_failed += 1
                     self.logger.warning(f"Failed to process fresh file: {file_path}")
             
             except Exception as e:
                 self.logger.error(f"Error processing fresh file {file_path}: {e}")
-                self._move_file(file_path, config.FAILED_DIR)
+                self._move_file(file_path, config.BACKLOG_DIR)
                 self.stats.files_failed += 1
                 self.stats.errors += 1
         
@@ -650,7 +642,6 @@ class OpenSearchIndexer:
                 items_added = self._process_jsonl_file(file_path, is_fresh=False)
                 
                 if items_added > 0:
-                    # Move to processed directory
                     self._move_file(file_path, config.PROCESSED_DIR)
                     self.stats.files_processed += 1
                     self.stats.backlog_files_processed += 1
@@ -658,13 +649,13 @@ class OpenSearchIndexer:
                     self.logger.info(f"Processed backlog file: {file_path} ({items_added} items)")
                 else:
                     # Move to failed directory
-                    self._move_file(file_path, config.FAILED_DIR)
+                    self._move_file(file_path, config.BACKLOG_DIR)
                     self.stats.files_failed += 1
                     self.logger.warning(f"Failed to process backlog file: {file_path}")
             
             except Exception as e:
                 self.logger.error(f"Error processing backlog file {file_path}: {e}")
-                self._move_file(file_path, config.FAILED_DIR)
+                self._move_file(file_path, config.BACKLOG_DIR)
                 self.stats.files_failed += 1
                 self.stats.errors += 1
         
